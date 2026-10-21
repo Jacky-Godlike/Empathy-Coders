@@ -1,0 +1,7 @@
+{
+  "name": "OrderFlow",
+  "description": "Order message inbox for small businesses to aggregate, filter, and analyze customer orders across WhatsApp, Email, and Manual Entry.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
