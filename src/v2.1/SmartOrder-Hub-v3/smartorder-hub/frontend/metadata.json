@@ -1,0 +1,6 @@
+{
+  "name": "SmartOrder Hub",
+  "description": "Warm, role-aware order desk for consolidating social, messaging and email orders, with rule-based stock, margin and risk analysis.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
