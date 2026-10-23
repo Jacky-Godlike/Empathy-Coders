@@ -1,0 +1,18 @@
+[
+  { "sku": "BEAN-ARABICA-1KG", "onHand": 48, "reserved": 12, "lastCountedAt": "2026-10-18" },
+  { "sku": "BEAN-ROBUSTA-1KG", "onHand": 30, "reserved": 5, "lastCountedAt": "2026-10-18" },
+  { "sku": "MILK-FRESH-1L", "onHand": 120, "reserved": 40, "lastCountedAt": "2026-10-20" },
+  { "sku": "MILK-OAT-1L", "onHand": 18, "reserved": 6, "lastCountedAt": "2026-10-20" },
+  { "sku": "CUP-12OZ", "onHand": 80, "reserved": 20, "lastCountedAt": "2026-10-19" },
+  { "sku": "CUP-16OZ", "onHand": 12, "reserved": 4, "lastCountedAt": "2026-10-19" },
+  { "sku": "LID-12OZ", "onHand": 70, "reserved": 10, "lastCountedAt": "2026-10-19" },
+  { "sku": "SYRUP-VANILLA-750ML", "onHand": 14, "reserved": 2, "lastCountedAt": "2026-10-17" },
+  { "sku": "SYRUP-CARAMEL-750ML", "onHand": 6, "reserved": 1, "lastCountedAt": "2026-10-17" },
+  { "sku": "SUGAR-1KG", "onHand": 80, "reserved": 20, "lastCountedAt": "2026-10-20" },
+  { "sku": "TEA-TARIK-500G", "onHand": 30, "reserved": 5, "lastCountedAt": "2026-10-18" },
+  { "sku": "MATCHA-500G", "onHand": 2, "reserved": 0, "lastCountedAt": "2026-10-18" },
+  { "sku": "CUP-SLEEVE-100", "onHand": 30, "reserved": 10, "lastCountedAt": "2026-10-19" },
+  { "sku": "STIRRER-1000", "onHand": 25, "reserved": 5, "lastCountedAt": "2026-10-19" },
+  { "sku": "CLEANER-5L", "onHand": 9, "reserved": 2, "lastCountedAt": "2026-10-17" },
+  { "sku": "NAPKIN-500", "onHand": 40, "reserved": 12, "lastCountedAt": "2026-10-19" }
+]

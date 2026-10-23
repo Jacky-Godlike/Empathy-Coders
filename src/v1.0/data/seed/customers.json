@@ -1,0 +1,112 @@
+[
+  {
+    "id": "CUST-001",
+    "name": "Nurul Aisyah",
+    "businessName": "Kedai Kopi Nurul",
+    "type": "Café",
+    "phone": "+60 12-345 6789",
+    "email": "nurul@kedaikopi.my",
+    "address": "12, Jalan SS2/24, 47300 Petaling Jaya, Selangor",
+    "channel": "whatsapp",
+    "notes": "Pays COD. Prefers WhatsApp in Malay or English."
+  },
+  {
+    "id": "CUST-002",
+    "name": "Mei Lin",
+    "businessName": "Brew & Bloom Café",
+    "type": "Café",
+    "phone": "+60 16-882 3410",
+    "email": "hello@brewbloom.my",
+    "address": "8, Jalan Telawi 3, Bangsar, 59100 Kuala Lumpur",
+    "channel": "email",
+    "notes": "Orders by email every Tuesday. Requires delivery before 11am."
+  },
+  {
+    "id": "CUST-003",
+    "name": "Pak Su",
+    "businessName": "Restoran Nasi Lemak Pak Su",
+    "type": "Restaurant",
+    "phone": "+60 19-774 2201",
+    "email": "paksu@rnl.my",
+    "address": "44, Jalan Chow Kit, 50350 Kuala Lumpur",
+    "channel": "whatsapp",
+    "notes": "Large weekend orders. Usually pays on delivery."
+  },
+  {
+    "id": "CUST-004",
+    "name": "The Daily Grind",
+    "businessName": "The Daily Grind Sdn Bhd",
+    "type": "Café chain",
+    "phone": "+60 3-7955 1208",
+    "email": "ops@dailygrind.my",
+    "address": "21, Jalan PJU 7/3, Mutiara Damansara, 47800 Petaling Jaya",
+    "channel": "email",
+    "notes": "Central purchasing for three outlets. PO reference required."
+  },
+  {
+    "id": "CUST-005",
+    "name": "BrightWorks Office",
+    "businessName": "BrightWorks Sdn Bhd",
+    "type": "Office",
+    "phone": "+60 11-2098 4432",
+    "email": "admin@brightworks.my",
+    "address": "Level 9, Menara Bright, Jalan Ampang, 50450 Kuala Lumpur",
+    "channel": "email",
+    "notes": "Pantry supplies. Requires invoice and 30-day terms."
+  },
+  {
+    "id": "CUST-006",
+    "name": "Kafe Hijau",
+    "businessName": "Kafe Hijau",
+    "type": "Café",
+    "phone": "+60 13-401 7788",
+    "email": "kafehijau@gmail.com",
+    "address": "5, Jalan Gasing, 46000 Petaling Jaya",
+    "channel": "whatsapp",
+    "notes": "Small neighbourhood café. Orders weekly."
+  },
+  {
+    "id": "CUST-007",
+    "name": "Sunway Catering",
+    "businessName": "Sunway Catering Services",
+    "type": "Caterer",
+    "phone": "+60 12-908 1177",
+    "email": "orders@sunwaycatering.my",
+    "address": "18, Jalan Lagoon Selatan, 47500 Subang Jaya",
+    "channel": "whatsapp",
+    "notes": "Urgent event orders. Confirm by phone for same-day delivery."
+  },
+  {
+    "id": "CUST-008",
+    "name": "Aroma Corner",
+    "businessName": "Aroma Corner",
+    "type": "Café",
+    "phone": "+60 17-556 9021",
+    "email": "aroma.corner@yahoo.com",
+    "address": "3, Jalan Bukit Bintang, 55100 Kuala Lumpur",
+    "channel": "email",
+    "notes": "Small specialty café. Often requests earlier delivery."
+  },
+  {
+    "id": "CUST-009",
+    "name": "Encik Faiz",
+    "businessName": "Kafe Faiz",
+    "type": "Café",
+    "phone": "+60 17-333 4455",
+    "email": null,
+    "address": null,
+    "channel": "whatsapp",
+    "notes": "New prospect. Address not yet on file."
+  },
+  {
+    "id": "CUST-010",
+    "name": "Cafe Lima",
+    "businessName": "Cafe Lima",
+    "type": "Café",
+    "phone": "+60 12-555 8899",
+    "email": "hello@cafelima.my",
+    "address": "12, Jalan Kemuning, 40400 Shah Alam, Selangor",
+    "channel": "whatsapp",
+    "notes": "New prospect. Price-sensitive."
+  }
+]

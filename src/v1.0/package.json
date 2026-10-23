@@ -1,0 +1,22 @@
+{
+  "name": "orderpilot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "OrderPilot — AI-assisted order consolidation and human approval for Malaysian SMEs",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "test": "node --test tests/*.test.js",
+    "seed": "node scripts/seed.js",
+    "reset": "node scripts/reset-demo.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "exceljs": "^4.4.0",
+    "express": "^4.21.2"
+  }
+}

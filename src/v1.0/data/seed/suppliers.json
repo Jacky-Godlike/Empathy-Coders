@@ -1,0 +1,57 @@
+[
+  {
+    "id": "SUP-BEAN",
+    "name": "Altitude Roasters",
+    "contactName": "Farah Idris",
+    "phone": "+60 3-7845 2210",
+    "email": "orders@altituderoasters.my",
+    "leadTimeDays": 3,
+    "minOrderValue": 300,
+    "paymentTerms": "Net 14",
+    "notes": "Roasts on Monday and Thursday. Cut-off 12pm."
+  },
+  {
+    "id": "SUP-DAIRY",
+    "name": "FarmFresh Distribution",
+    "contactName": "Kumar Raj",
+    "phone": "+60 3-8062 1188",
+    "email": "trade@farmfresh-dist.my",
+    "leadTimeDays": 1,
+    "minOrderValue": 150,
+    "paymentTerms": "Net 7",
+    "notes": "Daily delivery before 9am for orders placed before 4pm."
+  },
+  {
+    "id": "SUP-PACK",
+    "name": "PackHub Supplies",
+    "contactName": "Serena Wong",
+    "phone": "+60 3-5628 4400",
+    "email": "sales@packhub.my",
+    "leadTimeDays": 5,
+    "minOrderValue": 200,
+    "paymentTerms": "Net 30",
+    "notes": "Packaging stock ships from Shah Alam. No weekend dispatch."
+  },
+  {
+    "id": "SUP-SYRUP",
+    "name": "SweetLine Ingredients",
+    "contactName": "Hafiz Osman",
+    "phone": "+60 3-7729 6631",
+    "email": "hello@sweetline.my",
+    "leadTimeDays": 4,
+    "minOrderValue": 250,
+    "paymentTerms": "Net 14",
+    "notes": "Imported syrups; lead time may extend by 1 day during peak."
+  },
+  {
+    "id": "SUP-GROCERY",
+    "name": "Sin Seng Grocery",
+    "contactName": "Mr Tan",
+    "phone": "+60 3-7980 3321",
+    "email": "orders@sinseng.com.my",
+    "leadTimeDays": 2,
+    "minOrderValue": 100,
+    "paymentTerms": "COD",
+    "notes": "Local grocery and dry goods. Delivery on Tue and Fri."
+  }
+]

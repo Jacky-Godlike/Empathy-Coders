@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OrderPilot — Smart Order Desk for SMEs</title>
+    <meta
+      name="description"
+      content="OrderPilot turns WhatsApp and email orders into one verified order desk: AI reads, rules check stock and margin, and you approve."
+    />
+    <meta name="theme-color" content="#0f2f30" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230f2f30'/%3E%3Cpath d='M18 34l9 9 20-24' fill='none' stroke='%23e3a145' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/css/app.css" />
+  </head>
+  <body>
+    <div id="app" class="app-loading">
+      <div class="boot-screen">
+        <div class="boot-mark" aria-hidden="true">
+          <svg viewBox="0 0 64 64" width="52" height="52">
+            <rect width="64" height="64" rx="16" fill="#0f2f30" />
+            <path d="M18 34l9 9 20-24" fill="none" stroke="#e3a145" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </div>
+        <div class="boot-title">OrderPilot</div>
+        <div class="boot-sub">Opening your order desk…</div>
+        <div class="boot-bar"><span></span></div>
+      </div>
+    </div>
+    <div id="drawer-root"></div>
+    <div id="modal-root"></div>
+    <div id="scan-root"></div>
+    <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="false"></div>
+    <noscript>
+      <div class="noscript">OrderPilot needs JavaScript enabled to run the order desk.</div>
+    </noscript>
+    <script type="module" src="/js/app.js"></script>
+  </body>
+</html>

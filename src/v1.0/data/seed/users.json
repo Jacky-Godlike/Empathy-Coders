@@ -1,0 +1,18 @@
+[
+  {
+    "id": "u-aina",
+    "name": "Aina Rahman",
+    "role": "owner",
+    "title": "Owner / Manager",
+    "initials": "AR",
+    "email": "aina@kopiandco.my"
+  },
+  {
+    "id": "u-daniel",
+    "name": "Daniel Lim",
+    "role": "staff",
+    "title": "Order Desk Staff",
+    "initials": "DL",
+    "email": "daniel@kopiandco.my"
+  }
+]
