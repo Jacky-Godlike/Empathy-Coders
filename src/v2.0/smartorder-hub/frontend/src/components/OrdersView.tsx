@@ -37,6 +37,12 @@ import {
 } from '../services/ordersApi';
 import { RiskPieChart } from './RiskPieChart';
 import { CurrentUser, canApproveOrders } from '../types/user';
+import { useI18n } from '../i18n/I18nContext';
+
+type Translate = (
+  key: string,
+  vars?: Record<string, string | number>
+) => string;
 
 interface OrdersViewProps {
   industry: IndustryProfile;
@@ -84,47 +90,61 @@ const riskStyle: Record<RiskBand, string> = {
 const sourceStyle: Record<string, string> = {
   whatsapp:
     'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900',
+  facebook:
+    'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900',
+  instagram:
+    'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200 dark:bg-fuchsia-950/40 dark:text-fuchsia-300 dark:border-fuchsia-900',
+  telegram:
+    'bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950/40 dark:text-cyan-300 dark:border-cyan-900',
+  tiktok:
+    'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900',
   email:
     'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-900',
   manual:
     'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700',
 };
 
-function stockBadge(order: Order, industry: IndustryProfile) {
+function stockBadge(order: Order, industry: IndustryProfile, t: Translate) {
   const lines = order.analysis?.stock ?? [];
+  const stockLabel = t(
+    industry.inventoryMode === 'capacity'
+      ? 'inventory.capacity'
+      : industry.inventoryMode === 'material'
+      ? 'inventory.material'
+      : 'inventory.stock'
+  );
   const title = lines
     .map(
       (line) =>
-        `${line.name}: need ${line.required}, available ${line.available}, short ${line.shortfall}`
+        `${line.name}: ${t('review.need')} ${line.required}, ${t('review.available')} ${line.available}, ${t('review.shortfall')} ${line.shortfall}`
     )
     .join('\n');
 
   if (!lines.length) {
     return {
-      label: `No ${industry.labels.stock.toLowerCase()} check`,
+      label: t('orders.stockNoCheck', { stock: stockLabel.toLowerCase() }),
       className:
         'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
-      title: 'Run the analysis to see the availability check.',
+      title: t('orders.stockRun'),
     };
   }
 
   const short = lines.filter((line) => line.shortfall > 0);
   if (short.some((line) => !line.canReplenishInTime)) {
     return {
-      label: 'Cannot meet date',
+      label: t('orders.stockCannotMeet'),
       className: 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300',
       title,
     };
   }
   if (short.length > 0) {
-    const noun =
-      industry.inventoryMode === 'capacity'
-        ? 'capacity short'
-        : industry.inventoryMode === 'material'
-        ? 'material short'
-        : `item${short.length > 1 ? 's' : ''} to replenish`;
     return {
-      label: `${short.length} ${noun}`,
+      label:
+        industry.inventoryMode === 'capacity'
+          ? t('orders.stockCapacityShort')
+          : industry.inventoryMode === 'material'
+          ? t('orders.stockMaterialShort')
+          : t('orders.stockItemsShort', { count: short.length }),
       className:
         'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
       title,
@@ -133,10 +153,10 @@ function stockBadge(order: Order, industry: IndustryProfile) {
   return {
     label:
       industry.inventoryMode === 'capacity'
-        ? 'Capacity OK'
+        ? t('orders.stockCapacityOk')
         : industry.inventoryMode === 'material'
-        ? 'Material ready'
-        : 'In stock',
+        ? t('orders.stockMaterialReady')
+        : t('orders.stockInStock'),
     className:
       'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
     title,
@@ -185,6 +205,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
   refreshKey = 0,
   onDataChanged,
 }) => {
+  const { t } = useI18n();
   const canApprove = canApproveOrders(currentUser);
   const [orders, setOrders] = useState<Order[]>([]);
   const [summary, setSummary] = useState<IntakeSummary | null>(null);
@@ -193,6 +214,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
   const [actionId, setActionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [isRiskChartExpanded, setIsRiskChartExpanded] = useState(false);
   const [filter, setFilter] = useState<Filter>(
     mode === 'desk' ? 'pending' : 'all'
   );
@@ -212,9 +234,11 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
             setIsProcessing(true);
             const result = await processIntake();
             setNotice(
-              `Intake complete: ${result.processed} messages scanned, ` +
-                `${result.ordersCreated} orders created, ` +
-                `${result.processed - result.ordersCreated} filtered out.`
+              t('orders.intakeComplete', {
+                processed: result.processed,
+                orders: result.ordersCreated,
+                filtered: result.processed - result.ordersCreated,
+              })
             );
             setIsProcessing(false);
           }
@@ -228,15 +252,13 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
         setSummary(summaryData);
         onDataChanged?.();
       } catch (err: unknown) {
-        setError(
-          err instanceof Error ? err.message : 'Could not load the order table'
-        );
+        setError(err instanceof Error ? err.message : t('orders.loadError'));
       } finally {
         setIsLoading(false);
         setIsProcessing(false);
       }
     },
-    [mode, onDataChanged]
+    [mode, onDataChanged, t]
   );
 
   useEffect(() => {
@@ -331,7 +353,10 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
         decision: 'approve',
         actor: currentUser.name,
         role: currentUser.role,
-        note: `Confirmed by ${currentUser.name} (${currentUser.role}) from the order review table.`,
+        note: t('orders.confirmNote', {
+          name: currentUser.name,
+          role: currentUser.role === 'owner' ? t('header.owner') : t('header.staff'),
+        }),
       });
       setOrders((prev) =>
         prev.map((item) => (item.id === result.order.id ? result.order : item))
@@ -340,15 +365,17 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
       onDataChanged?.();
       const drafts = result.order.purchaseDrafts.length;
       setNotice(
-        `${result.order.id} approved` +
-          (drafts ? ` — ${drafts} purchase draft(s) created.` : '.')
+        t('orders.confirmSuccess', {
+          id: result.order.id,
+          drafts: drafts
+            ? t('orders.draftsCreated', { count: drafts })
+            : '',
+        })
       );
       // Keep the confirmed row visible instead of making it disappear from the queue.
       setFilter('all');
     } catch (err: unknown) {
-      setError(
-        err instanceof Error ? err.message : 'Could not confirm the order'
-      );
+      setError(err instanceof Error ? err.message : t('orders.confirmError'));
     } finally {
       setActionId(null);
     }
@@ -357,17 +384,17 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
   const filterOptions: [Filter, string][] =
     mode === 'desk'
       ? [
-          ['pending', `Needs confirmation (${counts.pending})`],
-          ['all', `All orders (${counts.all})`],
-          ['approved', `Approved (${counts.approved})`],
-          ['info', `Info requested (${counts.info})`],
-          ['rejected', `Rejected (${counts.rejected})`],
+          ['pending', t('orders.filterPending', { count: counts.pending })],
+          ['all', t('orders.filterAll', { count: counts.all })],
+          ['approved', t('orders.filterApproved', { count: counts.approved })],
+          ['info', t('orders.filterInfo', { count: counts.info })],
+          ['rejected', t('orders.filterRejected', { count: counts.rejected })],
         ]
       : [
-          ['all', `All records (${counts.all})`],
-          ['approved', `Approved (${counts.approved})`],
-          ['info', `Info requested (${counts.info})`],
-          ['rejected', `Rejected (${counts.rejected})`],
+          ['all', t('orders.filterAllRecords', { count: counts.all })],
+          ['approved', t('orders.filterApproved', { count: counts.approved })],
+          ['info', t('orders.filterInfo', { count: counts.info })],
+          ['rejected', t('orders.filterRejected', { count: counts.rejected })],
         ];
 
   return (
@@ -382,7 +409,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
               <Package className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
             )}
             <h2 className="text-base font-bold text-slate-900 dark:text-white">
-              {mode === 'desk' ? 'Order review' : 'Order records & purchases'}
+              {mode === 'desk' ? t('orders.deskTitle') : t('orders.recordsTitle')}
             </h2>
             <span
               className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${
@@ -391,13 +418,11 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                   : 'border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300'
               }`}
             >
-              {canApprove ? 'Owner approval' : 'View only'}
+              {canApprove ? t('orders.ownerApproval') : t('orders.viewOnly')}
             </span>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 max-w-2xl">
-            {mode === 'desk'
-              ? 'The intake engine has already read the raw messages. Confirm a clean row on the right; open the exceptions for the full reasoning.'
-              : 'Every approved, rejected and information-requested order, plus the purchase drafts generated for replenishment.'}
+            {mode === 'desk' ? t('orders.deskSubtitle') : t('orders.recordsSubtitle')}
           </p>
         </div>
 
@@ -410,21 +435,21 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
             <RefreshCw
               className={`w-3.5 h-3.5 ${isLoading || isProcessing ? 'animate-spin' : ''}`}
             />
-            Refresh
+            {t('orders.refresh')}
           </button>
           <a
             href={exportXlsxUrl()}
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700"
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
-            Excel
+            {t('orders.excel')}
           </a>
           <a
             href={exportCsvUrl()}
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-semibold hover:bg-slate-800 dark:hover:bg-slate-100"
           >
             <Download className="w-3.5 h-3.5" />
-            CSV
+            {t('orders.csv')}
           </a>
         </div>
       </div>
@@ -439,10 +464,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
       {isProcessing && (
         <div className="rounded-xl border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/40 p-3 text-xs text-blue-700 dark:text-blue-300 flex items-center gap-2">
           <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-          <span>
-            SmartOrder Hub is reading the raw WhatsApp and email messages,
-            classifying orders, inquiries, ads and after-sales…
-          </span>
+          <span>{t('orders.intakeRunning')}</span>
         </div>
       )}
 
@@ -455,7 +477,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
           <button
             onClick={() => setNotice(null)}
             className="p-0.5 rounded hover:opacity-70"
-            aria-label="Dismiss"
+            aria-label={t('common.close')}
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -467,12 +489,10 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
           <Lock className="w-4 h-4 shrink-0 mt-0.5" />
           <div>
             <p className="font-bold">
-              View-only access · {currentUser.name}
+              {t('orders.viewOnlyTitle', { name: currentUser.name })}
             </p>
             <p className="text-[11px] opacity-80 mt-0.5">
-              Staff can review every order, its stock, margin and risk
-              analysis, but only the Owner can confirm or reject. Switch the
-              identity in the top-right to owner.
+              {t('orders.viewOnlyBody')}
             </p>
           </div>
         </div>
@@ -480,34 +500,50 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
 
       {/* Summary cards + risk mix */}
       {mode === 'desk' ? (
-        <div className="grid gap-2.5 lg:grid-cols-[310px_1fr]">
-          <RiskPieChart orders={orders} />
-          <div className="grid grid-cols-2 gap-2.5">
+        <div className="grid gap-2.5 xl:grid-cols-4">
+          <div
+            className={`min-w-0 ${
+              isRiskChartExpanded ? 'xl:col-span-4' : 'xl:col-span-3'
+            }`}
+          >
+            <RiskPieChart
+              orders={orders}
+              isExpanded={isRiskChartExpanded}
+              onExpandedChange={setIsRiskChartExpanded}
+            />
+          </div>
+          <div
+            className={`grid grid-cols-2 gap-2.5 ${
+              isRiskChartExpanded
+                ? 'lg:grid-cols-4 xl:col-span-4'
+                : 'xl:grid-cols-1 xl:col-span-1'
+            }`}
+          >
             <StatCard
-              label="Messages scanned"
+              label={t('orders.messagesScanned')}
               value={summary?.totalMessages ?? '—'}
-              hint="WhatsApp, email and manual"
+              hint={t('orders.messagesScannedHint')}
               Icon={Inbox}
               tone="slate"
             />
             <StatCard
-              label="Orders detected"
+              label={t('orders.ordersDetected')}
               value={summary?.orders ?? '—'}
-              hint="Only real orders reach this table"
+              hint={t('orders.ordersDetectedHint')}
               Icon={ClipboardList}
               tone="blue"
             />
             <StatCard
-              label="Filtered out"
+              label={t('orders.filteredOut')}
               value={summary ? summary.totalMessages - summary.orders : '—'}
-              hint="Inquiries, ads, after-sales, noise"
+              hint={t('orders.filteredOutHint')}
               Icon={FilterX}
               tone="slate"
             />
             <StatCard
-              label="Awaiting confirmation"
+              label={t('orders.awaitingConfirmation')}
               value={summary?.awaitingConfirmation ?? '—'}
-              hint="Click Confirm on the right"
+              hint={t('orders.awaitingConfirmationHint')}
               Icon={Clock}
               tone="amber"
             />
@@ -516,30 +552,30 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
       ) : (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
           <StatCard
-            label="Approved orders"
+            label={t('orders.approvedOrders')}
             value={recordStats.approved}
-            hint="Human-approved records"
+            hint={t('orders.approvedOrdersHint')}
             Icon={CheckCircle2}
             tone="emerald"
           />
           <StatCard
-            label="Purchase drafts"
+            label={t('orders.purchaseDrafts')}
             value={recordStats.drafts}
-            hint="Replenishment proposals, not real POs"
+            hint={t('orders.purchaseDraftsHint')}
             Icon={ShoppingCart}
             tone="blue"
           />
           <StatCard
-            label="Awaiting information"
+            label={t('orders.awaitingInfo')}
             value={recordStats.info}
-            hint="Customer reply needed"
+            hint={t('orders.awaitingInfoHint')}
             Icon={Clock}
             tone="amber"
           />
           <StatCard
-            label="Approved value"
+            label={t('orders.approvedValue')}
             value={money(recordStats.value)}
-            hint="Revenue on approved orders"
+            hint={t('orders.approvedValueHint')}
             Icon={Package}
             tone="slate"
           />
@@ -548,12 +584,16 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
 
       {summary && (
         <p className="text-[11px] text-slate-500 dark:text-slate-400">
-          Auto-classified {summary.processedMessages} of {summary.totalMessages}{' '}
-          messages: {summary.byType.order ?? 0} orders,{' '}
-          {summary.byType.inquiry ?? 0} inquiries, {summary.byType.ad ?? 0} ads,{' '}
-          {summary.byType.after_sales ?? 0} after-sales,{' '}
-          {summary.byType.other ?? 0} other, {summary.byType.uncertain ?? 0}{' '}
-          uncertain.
+          {t('orders.autoClassified', {
+            processed: summary.processedMessages,
+            total: summary.totalMessages,
+            orders: summary.byType.order ?? 0,
+            inquiries: summary.byType.inquiry ?? 0,
+            ads: summary.byType.ad ?? 0,
+            afterSales: summary.byType.after_sales ?? 0,
+            other: summary.byType.other ?? 0,
+            uncertain: summary.byType.uncertain ?? 0,
+          })}
         </p>
       )}
 
@@ -589,24 +629,24 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
           <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto" />
           <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
             {filter === 'pending' && counts.all > 0
-              ? 'All caught up'
+              ? t('orders.emptyCaughtUp')
               : mode === 'records' && counts.all === 0
-              ? 'No order records yet'
-              : 'No orders in this filter'}
+              ? t('orders.emptyNoRecords')
+              : t('orders.emptyFilter')}
           </p>
           <p className="text-xs text-slate-500 dark:text-slate-400">
             {filter === 'pending' && counts.all > 0
-              ? 'No order is waiting for confirmation. Check All orders or the raw Inbox.'
+              ? t('orders.emptyCaughtUpBody')
               : mode === 'records' && counts.all === 0
-              ? 'Open the Order Desk to run intake and confirm the first order.'
-              : 'Nothing matches this status yet. Try All orders.'}
+              ? t('orders.emptyNoRecordsBody')
+              : t('orders.emptyFilterBody')}
           </p>
           {filter !== 'all' && counts.all > 0 && (
             <button
               onClick={() => setFilter('all')}
               className="mt-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700"
             >
-              View all orders
+              {t('orders.viewAll')}
             </button>
           )}
         </div>
@@ -619,32 +659,38 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
           >
             <thead className="bg-slate-50 dark:bg-slate-800/70 text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700">
               <tr>
-                <th className="py-2.5 px-3 font-semibold">Order</th>
-                <th className="py-2.5 px-3 font-semibold">Source</th>
-                <th className="py-2.5 px-3 font-semibold">Customer</th>
+                <th className="py-2.5 px-3 font-semibold">{t('orders.colOrder')}</th>
+                <th className="py-2.5 px-3 font-semibold">{t('orders.colSource')}</th>
+                <th className="py-2.5 px-3 font-semibold">{t('orders.colCustomer')}</th>
                 <th className="py-2.5 px-3 font-semibold">
-                  {industry.labels.summary}
+                  {t('orders.colItems')}
                 </th>
                 {tableFields.length > 0 && (
                   <th className="py-2.5 px-3 font-semibold">
-                    {industry.labels.details}
+                    {t('orders.colDetails')}
                   </th>
                 )}
-                <th className="py-2.5 px-3 font-semibold text-right">Total</th>
+                <th className="py-2.5 px-3 font-semibold text-right">{t('orders.colTotal')}</th>
                 <th className="py-2.5 px-3 font-semibold">
-                  {industry.labels.date}
+                  {t('orders.colDelivery')}
                 </th>
                 <th className="py-2.5 px-3 font-semibold">
-                  {industry.labels.stock}
+                  {t(
+                    industry.inventoryMode === 'capacity'
+                      ? 'inventory.capacity'
+                      : industry.inventoryMode === 'material'
+                      ? 'inventory.material'
+                      : 'inventory.stock'
+                  )}
                 </th>
-                <th className="py-2.5 px-3 font-semibold text-right">Margin</th>
-                <th className="py-2.5 px-3 font-semibold">Risk</th>
-                <th className="py-2.5 px-3 font-semibold">Recommendation</th>
+                <th className="py-2.5 px-3 font-semibold text-right">{t('orders.colMargin')}</th>
+                <th className="py-2.5 px-3 font-semibold">{t('orders.colRisk')}</th>
+                <th className="py-2.5 px-3 font-semibold">{t('orders.colRecommendation')}</th>
                 {mode === 'records' && (
-                  <th className="py-2.5 px-3 font-semibold">Purchases</th>
+                  <th className="py-2.5 px-3 font-semibold">{t('orders.colPurchases')}</th>
                 )}
                 <th className="py-2.5 px-3 font-semibold text-right sticky right-0 bg-slate-50 dark:bg-slate-800 border-l border-slate-200 dark:border-slate-700">
-                  Action
+                  {t('orders.colAction')}
                 </th>
               </tr>
             </thead>
@@ -658,7 +704,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                   order.status === 'analyzed' &&
                   (recommendation === 'ACCEPT' ||
                     recommendation === 'ACCEPT_WITH_PURCHASE');
-                const stock = stockBadge(order, industry);
+                const stock = stockBadge(order, industry, t);
                 const margin = analysis?.margin ?? 0;
                 const band: RiskBand = analysis?.riskBand ?? 'Low';
                 const riskTitle =
@@ -669,10 +715,10 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                           factor.weight * 100
                         ).toFixed(0)}% = ${factor.weighted.toFixed(1)}`
                     )
-                    .join('\n') || 'No risk factors available';
-                const highRisk =
+                    .join('\n') || t('orders.noRiskFactors');
+                const needsRiskReview =
                   Boolean(analysis) &&
-                  (band === 'High' || band === 'Critical');
+                  band !== 'Low';
                 const detailValues = tableFields
                   .map((field) => ({
                     field,
@@ -702,7 +748,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                           sourceStyle[order.source] || sourceStyle.manual
                         }`}
                       >
-                        {order.source}
+                        {t(`source.${order.source}`)}
                       </span>
                     </td>
                     <td className="py-3 px-3">
@@ -744,7 +790,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                                 </span>{' '}
                                 <span
                                   className="font-medium break-words"
-                                  title={value}
+                                  title={value ?? undefined}
                                 >
                                   {value}
                                 </span>
@@ -761,7 +807,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                                   )
                                   .join('\n')}
                               >
-                                +{detailValues.length - 3} more
+                                {t('orders.moreDetails', { count: detailValues.length - 3 })}
                               </p>
                             )}
                             {missingRequired.map((field) => (
@@ -769,7 +815,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                                 key={`missing-${field.key}`}
                                 className="text-[10px] font-semibold text-rose-600 dark:text-rose-400"
                               >
-                                {field.label} missing
+                                {t('orders.stockMissing', { field: field.label })}
                               </p>
                             ))}
                           </div>
@@ -781,13 +827,13 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                     </td>
                     <td className="py-3 px-3">
                       <p className="font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                        {order.requestedDeliveryDate || 'No date'}
+                        {order.requestedDeliveryDate || t('orders.noDate')}
                       </p>
                       <p
                         className="text-[10px] text-slate-400 max-w-[190px] truncate"
                         title={order.deliveryAddress}
                       >
-                        {order.deliveryAddress || 'No address'}
+                        {order.deliveryAddress || t('orders.noAddress')}
                       </p>
                     </td>
                     <td className="py-3 px-3">
@@ -822,7 +868,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                           title={riskTitle}
                         >
                           <ShieldAlert className="w-2.5 h-2.5" />
-                          {band} · {Math.round(analysis.riskScore)}
+                          {t(`orders.risk${band}`)} · {Math.round(analysis.riskScore)}
                         </span>
                       ) : (
                         <span className="text-slate-400">—</span>
@@ -834,15 +880,25 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                           <span
                             className={`inline-block px-2 py-0.5 rounded-full border text-[10px] font-semibold ${recommendationStyle[recommendation]}`}
                           >
-                            {recommendation.replace(/_/g, ' ')}
+                            {t(
+                              recommendation === 'ACCEPT'
+                                ? 'orders.recommendationAccept'
+                                : recommendation === 'ACCEPT_WITH_PURCHASE'
+                                ? 'orders.recommendationAcceptPurchase'
+                                : recommendation === 'REQUEST_INFO'
+                                ? 'orders.recommendationRequestInfo'
+                                : recommendation === 'REJECT'
+                                ? 'orders.recommendationReject'
+                                : 'orders.recommendationNeedsReview'
+                            )}
                           </span>
                           <p className="text-[10px] text-slate-400 mt-0.5">
-                            {order.extractionMethod === 'ai' ? 'AI' : 'Rules'} ·{' '}
+                            {order.extractionMethod === 'ai' ? t('orders.ai') : t('orders.rules')} ·{' '}
                             {Math.round((analysis?.confidence ?? 0) * 100)}%
                           </p>
                         </>
                       ) : (
-                        <span className="text-slate-400">Not analysed</span>
+                        <span className="text-slate-400">{t('orders.notAnalysed')}</span>
                       )}
                     </td>
                     {mode === 'records' && (
@@ -850,8 +906,10 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                         {order.purchaseDrafts.length > 0 ? (
                           <div>
                             <p className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                              {order.purchaseDrafts.length} draft
-                              {order.purchaseDrafts.length > 1 ? 's' : ''}
+                              {order.purchaseDrafts.length}{' '}
+                              {order.purchaseDrafts.length > 1
+                                ? t('orders.drafts')
+                                : t('orders.draft')}
                             </p>
                             <p
                               className="text-[10px] text-slate-400 max-w-[170px] truncate"
@@ -871,7 +929,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                     )}
                     <td className="py-3 px-3 text-right whitespace-nowrap sticky right-0 bg-white dark:bg-slate-900 group-hover:bg-slate-50 dark:group-hover:bg-slate-800 border-l border-slate-100 dark:border-slate-800">
                       <div className="flex flex-col items-end gap-1">
-                        {highRisk && (
+                        {needsRiskReview && (
                           <button
                             type="button"
                             onClick={(event) => {
@@ -881,29 +939,31 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                             className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[9px] font-bold ${
                               band === 'Critical'
                                 ? 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100'
-                                : 'border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100'
+                                : band === 'High'
+                                ? 'border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100'
+                                : 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'
                             }`}
-                            title="Open the full risk analysis"
+                            title={t('orders.openRisk')}
                           >
                             <BarChart3 className="w-2.5 h-2.5" />
-                            Analysis
+                            {t('orders.analysis')}
                           </button>
                         )}
 
                         {order.status === 'approved' ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 text-[10px] font-bold">
                             <CheckCircle2 className="w-3 h-3" />
-                            Approved
+                            {t('orders.approved')}
                           </span>
                         ) : order.status === 'rejected' ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 text-[10px] font-bold">
                             <XCircle className="w-3 h-3" />
-                            Rejected
+                            {t('orders.rejected')}
                           </span>
                         ) : order.status === 'info_requested' ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 text-[10px] font-bold">
                             <Clock className="w-3 h-3" />
-                            Info sent
+                            {t('orders.infoSent')}
                           </span>
                         ) : canConfirm ? (
                           <button
@@ -919,7 +979,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                             ) : (
                               <CheckCircle2 className="w-3.5 h-3.5" />
                             )}
-                            Confirm
+                            {t('orders.confirm')}
                           </button>
                         ) : (
                           <button
@@ -930,11 +990,11 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-[11px] font-bold hover:bg-slate-800 dark:hover:bg-slate-100"
                           >
                             {canApprove ? (
-                              'Review'
+                              t('orders.review')
                             ) : (
                               <>
                                 <Eye className="w-3 h-3" />
-                                View
+                                {t('orders.view')}
                               </>
                             )}
                           </button>
@@ -953,9 +1013,9 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
         <ClipboardList className="w-3.5 h-3.5" />
         {mode === 'desk'
           ? canApprove
-            ? 'Confirm is a one-click owner approval. Click a row for stock, risk factors, purchase drafts and the activity log.'
-            : 'View-only mode: staff can inspect every row and its analysis, but only the Owner can confirm.'
-          : 'Purchase drafts are proposals only — no real purchase order is sent. Click a row to see the full approval trail.'}
+            ? t('orders.footerOwner')
+            : t('orders.footerStaff')
+          : t('orders.footerRecords')}
       </div>
     </div>
   );

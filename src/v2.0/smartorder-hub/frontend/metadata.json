@@ -1,7 +1,6 @@
 {
-  "name": "OrderFlow",
-  "description": "Order message inbox for small businesses to aggregate, filter, and analyze customer orders across WhatsApp, Email, and Manual Entry.",
+  "name": "SmartOrder Hub",
+  "description": "Smart order collection and owner approval for Malaysian SMEs, with WhatsApp, Messenger, Instagram, Telegram, email and TikTok channels plus English, Chinese and Malay UI.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
-

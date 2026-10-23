@@ -1,0 +1,30 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+backend/.tmp-data/
+
+# Generated demo store
+backend/app/data/
+db.json
+
+# Node / frontend build
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Local scratch files
+.tmp-*
+*-desk-*.png

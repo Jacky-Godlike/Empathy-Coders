@@ -15,6 +15,8 @@ import {
   Info,
 } from 'lucide-react';
 import { MessageSource, NewMessageInput } from '../types/message';
+import { useI18n } from '../i18n/I18nContext';
+import { sourceFromText } from '../services/messagesApi';
 
 interface AddMessageModalProps {
   isOpen: boolean;
@@ -29,6 +31,7 @@ export const AddMessageModal: React.FC<AddMessageModalProps> = ({
   onSubmit,
   onBatchImport,
 }) => {
+  const { t } = useI18n();
   // Form fields
   const [source, setSource] = useState<MessageSource>('whatsapp');
   const [sender, setSender] = useState('');
@@ -86,9 +89,7 @@ export const AddMessageModal: React.FC<AddMessageModalProps> = ({
         (row) => !row.sender.trim() || !row.originalText.trim()
       );
       if (invalidRows.length > 0) {
-        setFormErrorMessage(
-          `Some CSV rows are missing required sender or message text. Please check the imported list.`
-        );
+        setFormErrorMessage(t('add.error.invalidRows'));
         return false;
       }
       return true;
@@ -96,17 +97,17 @@ export const AddMessageModal: React.FC<AddMessageModalProps> = ({
 
     // Single message validation
     if (!sender.trim()) {
-      errors.sender = 'Sender name is required.';
+      errors.sender = t('add.error.senderRequired');
     }
 
     if (!originalText.trim()) {
-      errors.originalText = 'Original message text is required.';
+      errors.originalText = t('add.error.textRequired');
     }
 
     setFieldErrors(errors);
 
     if (Object.keys(errors).length > 0) {
-      setFormErrorMessage('Please fill in all required fields marked in red.');
+      setFormErrorMessage(t('add.error.requiredFields'));
       return false;
     }
 
@@ -142,7 +143,7 @@ export const AddMessageModal: React.FC<AddMessageModalProps> = ({
       handleClose();
     } catch (err: unknown) {
       setFormErrorMessage(
-        err instanceof Error ? err.message : 'An unexpected error occurred while saving.'
+        err instanceof Error ? err.message : t('add.error.unexpected')
       );
     } finally {
       setIsSubmitting(false);
@@ -170,7 +171,7 @@ export const AddMessageModal: React.FC<AddMessageModalProps> = ({
 
     if (extension !== 'txt' && extension !== 'csv') {
       setFormErrorMessage(
-        `Invalid file type ".${extension || 'unknown'}". Please select a .txt or .csv file.`
+        t('add.error.invalidType', { extension: extension || 'unknown' })
       );
       return;
     }
@@ -189,7 +190,7 @@ export const AddMessageModal: React.FC<AddMessageModalProps> = ({
         const textContent = (event.target?.result as string) || '';
 
         if (!textContent.trim()) {
-          setFormErrorMessage('The selected .txt file is empty. Please select a valid file.');
+          setFormErrorMessage(t('add.error.txtEmpty'));
           clearUploadedFile();
           return;
         }
@@ -211,7 +212,7 @@ export const AddMessageModal: React.FC<AddMessageModalProps> = ({
 
       reader.onerror = () => {
         setIsParsingFile(false);
-        setFormErrorMessage('Failed to read the .txt file. Please check file permissions.');
+        setFormErrorMessage(t('add.error.txtRead'));
         clearUploadedFile();
       };
 
@@ -226,7 +227,7 @@ export const AddMessageModal: React.FC<AddMessageModalProps> = ({
 
         if (!rawContent.trim()) {
           setIsParsingFile(false);
-          setFormErrorMessage('The selected CSV file is empty. Please provide a valid CSV file.');
+          setFormErrorMessage(t('add.error.csvEmpty'));
           clearUploadedFile();
           return;
         }
@@ -243,7 +244,10 @@ export const AddMessageModal: React.FC<AddMessageModalProps> = ({
               const firstErr = results.errors[0];
               const lineInfo = firstErr.row !== undefined ? ` at row ${firstErr.row + 1}` : '';
               setFormErrorMessage(
-                `CSV formatting error${lineInfo}: ${firstErr.message}. Please check quote closures and commas.`
+                t('add.error.csvFormat', {
+                  lineInfo,
+                  message: firstErr.message,
+                })
               );
               clearUploadedFile();
               return;
@@ -253,9 +257,7 @@ export const AddMessageModal: React.FC<AddMessageModalProps> = ({
             const parsedMessages = mapCsvRowsToMessages(rows, rawContent);
 
             if (parsedMessages.length === 0) {
-              setFormErrorMessage(
-                'Invalid CSV structure: Could not find any valid message rows. Please ensure your CSV includes a "message" or "text" column, or non-empty message content.'
-              );
+              setFormErrorMessage(t('add.error.csvNoRows'));
               clearUploadedFile();
               return;
             }
@@ -273,13 +275,13 @@ export const AddMessageModal: React.FC<AddMessageModalProps> = ({
               // Multiple messages in CSV: show batch review list
               setCsvParsedRows(parsedMessages);
               setOriginalText(
-                `Imported ${parsedMessages.length} messages from "${file.name}". You can review each message in the preview list below before confirming.`
+                t('add.importedFrom', { count: parsedMessages.length, file: file.name })
               );
             }
           },
           error: (error: Error) => {
             setIsParsingFile(false);
-            setFormErrorMessage(`Failed to parse CSV: ${error.message}`);
+            setFormErrorMessage(t('add.error.csvParse', { message: error.message }));
             clearUploadedFile();
           },
         });
@@ -287,7 +289,7 @@ export const AddMessageModal: React.FC<AddMessageModalProps> = ({
 
       reader.onerror = () => {
         setIsParsingFile(false);
-        setFormErrorMessage('Failed to read the .csv file.');
+        setFormErrorMessage(t('add.error.csvRead'));
         clearUploadedFile();
       };
 
@@ -333,14 +335,7 @@ export const AddMessageModal: React.FC<AddMessageModalProps> = ({
           const rawSender = senderKey && row[senderKey]?.trim() ? row[senderKey].trim() : `Customer #${idx + 1}`;
           const rawContact = contactKey && row[contactKey]?.trim() ? row[contactKey].trim() : undefined;
 
-          let msgSource: MessageSource = 'whatsapp';
-          if (sourceKey && row[sourceKey]) {
-            const sVal = row[sourceKey].toLowerCase();
-            if (sVal.includes('email') || sVal.includes('mail')) msgSource = 'email';
-            else if (sVal.includes('manual') || sVal.includes('call') || sVal.includes('phone') || sVal.includes('walk-in'))
-              msgSource = 'manual';
-            else msgSource = 'whatsapp';
-          }
+          const msgSource = sourceFromText(sourceKey ? row[sourceKey] : undefined);
 
           results.push({
             sender: rawSender,
@@ -381,17 +376,11 @@ export const AddMessageModal: React.FC<AddMessageModalProps> = ({
         msgText = cols[1].trim();
       } else if (cols.length === 3) {
         msgSender = cols[0].trim() || msgSender;
-        const sVal = cols[1].toLowerCase();
-        if (sVal.includes('email')) msgSource = 'email';
-        else if (sVal.includes('manual') || sVal.includes('phone')) msgSource = 'manual';
-        else msgSource = 'whatsapp';
+        msgSource = sourceFromText(cols[1]);
         msgText = cols[2].trim();
       } else {
         msgSender = cols[0].trim() || msgSender;
-        const sVal = cols[1].toLowerCase();
-        if (sVal.includes('email')) msgSource = 'email';
-        else if (sVal.includes('manual') || sVal.includes('phone')) msgSource = 'manual';
-        else msgSource = 'whatsapp';
+        msgSource = sourceFromText(cols[1]);
         msgContact = cols[2].trim() || undefined;
         msgText = cols.slice(3).join(', ').trim();
       }
@@ -455,7 +444,10 @@ Front Desk Walk-in,manual,Counter Tablet #1,Customer pre-ordered 2 custom birthd
 
     setCsvParsedRows(mapped);
     setOriginalText(
-      `Imported ${mapped.length} messages from "sample_orders_batch.csv". Review the parsed entries below before confirming submission.`
+      `${t('add.importedFrom', {
+        count: mapped.length,
+        file: 'sample_orders_batch.csv',
+      })} ${t('add.reviewImportedNotice')}`
     );
     setFieldErrors({});
     setFormErrorMessage(null);
@@ -495,15 +487,15 @@ Front Desk Walk-in,manual,Counter Tablet #1,Customer pre-ordered 2 custom birthd
         <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-slate-100 dark:border-slate-800 shrink-0">
           <div>
             <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <span>Add Message to Inbox</span>
+              <span>{t('add.title')}</span>
               {uploadedFileType && (
                 <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300">
-                  .{uploadedFileType} Mode
+                  {t('add.fileMode', { type: uploadedFileType })}
                 </span>
               )}
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Select a source, enter sender and text, or import from a TXT or CSV file.
+              {t('add.subtitle')}
             </p>
           </div>
           <button
@@ -521,7 +513,7 @@ Front Desk Walk-in,manual,Counter Tablet #1,Customer pre-ordered 2 custom birthd
             <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-xs flex items-start gap-2.5 animate-in fade-in">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600" />
               <div className="flex-1">
-                <p className="font-semibold">Unable to submit message</p>
+                <p className="font-semibold">{t('add.unable')}</p>
                 <p className="mt-0.5">{formErrorMessage}</p>
               </div>
             </div>
@@ -530,14 +522,14 @@ Front Desk Walk-in,manual,Counter Tablet #1,Customer pre-ordered 2 custom birthd
           {/* 1. Source Selector */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-              Message Source <span className="text-rose-500">*</span>
+              {t('add.source')} <span className="text-rose-500">*</span>
             </label>
             <div className="grid grid-cols-3 gap-2">
               {(
                 [
-                  { id: 'whatsapp', label: 'WhatsApp', icon: '💬' },
-                  { id: 'email', label: 'Email', icon: '✉️' },
-                  { id: 'manual', label: 'Manual Entry', icon: '📝' },
+                  { id: 'whatsapp', label: t('source.whatsapp'), icon: '💬' },
+                  { id: 'email', label: t('source.email'), icon: '✉️' },
+                  { id: 'manual', label: t('source.manual'), icon: '📝' },
                 ] as const
               ).map((item) => (
                 <button
@@ -562,7 +554,7 @@ Front Desk Walk-in,manual,Counter Tablet #1,Customer pre-ordered 2 custom birthd
             <div className="flex items-center justify-between">
               <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                 <Upload className="w-3.5 h-3.5 text-blue-600" />
-                <span>Import from File (TXT or CSV)</span>
+                <span>{t('add.importFile')}</span>
               </label>
 
               {uploadedFileName && (
@@ -572,7 +564,7 @@ Front Desk Walk-in,manual,Counter Tablet #1,Customer pre-ordered 2 custom birthd
                   className="text-[11px] text-rose-600 dark:text-rose-400 hover:underline flex items-center gap-1"
                 >
                   <Trash2 className="w-3 h-3" />
-                  <span>Clear file</span>
+                  <span>{t('add.clearFile')}</span>
                 </button>
               )}
             </div>
@@ -597,7 +589,7 @@ Front Desk Walk-in,manual,Counter Tablet #1,Customer pre-ordered 2 custom birthd
               {isParsingFile ? (
                 <div className="flex items-center justify-center gap-2 text-xs text-blue-600">
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Reading and parsing file...</span>
+                  <span>{t('add.reading')}</span>
                 </div>
               ) : uploadedFileName ? (
                 <div className="flex items-center justify-center gap-2 text-xs text-emerald-800 dark:text-emerald-300">
@@ -611,15 +603,13 @@ Front Desk Walk-in,manual,Counter Tablet #1,Customer pre-ordered 2 custom birthd
                     <span className="text-slate-400">({Math.round(uploadedFileSize / 1024 * 10) / 10} KB)</span>
                   )}
                   <span className="text-xs bg-emerald-100 dark:bg-emerald-900/60 px-2 py-0.5 rounded text-emerald-800 dark:text-emerald-200">
-                    Loaded
+                    {t('add.loaded')}
                   </span>
                 </div>
               ) : (
                 <div className="flex items-center justify-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                   <Upload className="w-4 h-4 text-slate-400" />
-                  <span>
-                    Click to browse <strong>.txt</strong> or <strong>.csv</strong> files
-                  </span>
+                  <span>{t('add.clickBrowse')}</span>
                 </div>
               )}
             </div>
@@ -628,7 +618,7 @@ Front Desk Walk-in,manual,Counter Tablet #1,Customer pre-ordered 2 custom birthd
             <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pt-1">
               <span className="flex items-center gap-1">
                 <Sparkles className="w-3 h-3 text-amber-500" />
-                Quick test files:
+                {t('add.quickTest')}
               </span>
               <div className="flex gap-2.5">
                 <button
@@ -636,7 +626,7 @@ Front Desk Walk-in,manual,Counter Tablet #1,Customer pre-ordered 2 custom birthd
                   onClick={handleLoadSampleTxt}
                   className="text-blue-600 hover:underline dark:text-blue-400 font-medium cursor-pointer"
                 >
-                  Load Sample .txt
+                  {t('add.loadTxt')}
                 </button>
                 <span>•</span>
                 <button
@@ -644,7 +634,7 @@ Front Desk Walk-in,manual,Counter Tablet #1,Customer pre-ordered 2 custom birthd
                   onClick={handleLoadSampleCsv}
                   className="text-blue-600 hover:underline dark:text-blue-400 font-medium cursor-pointer"
                 >
-                  Load Sample .csv (3 Rows)
+                  {t('add.loadCsv')}
                 </button>
               </div>
             </div>
@@ -658,7 +648,7 @@ Front Desk Walk-in,manual,Counter Tablet #1,Customer pre-ordered 2 custom birthd
                 <div className="flex items-center gap-2">
                   <FileSpreadsheet className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                   <span className="text-xs font-semibold text-slate-900 dark:text-white">
-                    Review {csvParsedRows.length} Imported Messages
+                    {t('add.reviewCount', { count: csvParsedRows.length })}
                   </span>
                 </div>
                 <div className="flex items-center gap-1 text-[11px]">
@@ -671,7 +661,7 @@ Front Desk Walk-in,manual,Counter Tablet #1,Customer pre-ordered 2 custom birthd
                         : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800'
                     }`}
                   >
-                    Parsed Cards
+                    {t('add.parsedCards')}
                   </button>
                   <button
                     type="button"
@@ -682,7 +672,7 @@ Front Desk Walk-in,manual,Counter Tablet #1,Customer pre-ordered 2 custom birthd
                         : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800'
                     }`}
                   >
-                    Raw CSV Text
+                    {t('add.rawCsv')}
                   </button>
                 </div>
               </div>
@@ -700,7 +690,7 @@ Front Desk Walk-in,manual,Counter Tablet #1,Customer pre-ordered 2 custom birthd
                             {row.sender}
                           </span>
                           <span className="text-[10px] uppercase font-bold px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                            {row.source}
+                            {t(`source.${row.source}`)}
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -708,15 +698,15 @@ Front Desk Walk-in,manual,Counter Tablet #1,Customer pre-ordered 2 custom birthd
                             type="button"
                             onClick={() => handleEditRowInForm(row)}
                             className="text-[10px] text-blue-600 dark:text-blue-400 hover:underline"
-                            title="Edit this single message in form"
+                            title={t('add.edit')}
                           >
-                            Edit
+                            {t('add.edit')}
                           </button>
                           <button
                             type="button"
                             onClick={() => handleRemoveCsvRow(idx)}
                             className="text-slate-400 hover:text-rose-600"
-                            title="Remove this message"
+                            title={t('add.remove')}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -736,9 +726,7 @@ Front Desk Walk-in,manual,Counter Tablet #1,Customer pre-ordered 2 custom birthd
 
               <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
                 <Info className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                <span>
-                  All {csvParsedRows.length} messages will be assigned a temporary local ID with <strong>Not Analyzed</strong> status upon submission.
-                </span>
+                <span>{t('add.batchNote', { count: csvParsedRows.length })}</span>
               </p>
             </div>
           ) : (
@@ -749,9 +737,7 @@ Front Desk Walk-in,manual,Counter Tablet #1,Customer pre-ordered 2 custom birthd
                 <div className="p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
                     <FileCheck2 className="w-4 h-4 text-emerald-600" />
-                    <span>
-                      Loaded from <strong>{uploadedFileName}</strong>. Review and edit the text below before submitting.
-                    </span>
+                    <span>{t('add.loadedFrom', { file: uploadedFileName ?? '' })}</span>
                   </div>
                 </div>
               )}
@@ -760,7 +746,7 @@ Front Desk Walk-in,manual,Counter Tablet #1,Customer pre-ordered 2 custom birthd
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Sender Name <span className="text-rose-500">*</span>
+                    {t('add.sender')} <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -771,7 +757,7 @@ Front Desk Walk-in,manual,Counter Tablet #1,Customer pre-ordered 2 custom birthd
                         setFieldErrors((prev) => ({ ...prev, sender: undefined }));
                       }
                     }}
-                    placeholder="e.g. Sarah Jenkins"
+                    placeholder={t('add.senderPlaceholder')}
                     className={`w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border rounded-lg focus:outline-none focus:ring-2 text-slate-900 dark:text-slate-100 transition ${
                       fieldErrors.sender
                         ? 'border-rose-400 focus:ring-rose-400 bg-rose-50/20'
@@ -787,13 +773,13 @@ Front Desk Walk-in,manual,Counter Tablet #1,Customer pre-ordered 2 custom birthd
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Contact Info (Phone / Email)
+                    {t('add.contact')}
                   </label>
                   <input
                     type="text"
                     value={contact}
                     onChange={(e) => setContact(e.target.value)}
-                    placeholder="e.g. +1 (555) 234-8901"
+                    placeholder={t('add.contactPlaceholder')}
                     className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100"
                   />
                 </div>
@@ -803,11 +789,11 @@ Front Desk Walk-in,manual,Counter Tablet #1,Customer pre-ordered 2 custom birthd
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                    Original Message Text <span className="text-rose-500">*</span>
+                    {t('add.original')} <span className="text-rose-500">*</span>
                   </label>
                   {originalText && (
                     <span className="text-[10px] text-slate-400">
-                      {originalText.length} characters
+                      {t('add.characters', { count: originalText.length })}
                     </span>
                   )}
                 </div>
@@ -821,7 +807,7 @@ Front Desk Walk-in,manual,Counter Tablet #1,Customer pre-ordered 2 custom birthd
                       setFieldErrors((prev) => ({ ...prev, originalText: undefined }));
                     }
                   }}
-                  placeholder="Paste or review the customer order message (e.g. 'Can I order 2 sourdough loaves and 4 croissants for pickup tomorrow?')..."
+                  placeholder={t('add.messagePlaceholder')}
                   className={`w-full px-3 py-2.5 text-xs font-normal bg-slate-50 dark:bg-slate-800 border rounded-lg focus:outline-none focus:ring-2 text-slate-900 dark:text-slate-100 placeholder-slate-400 transition leading-relaxed ${
                     fieldErrors.originalText
                       ? 'border-rose-400 focus:ring-rose-400 bg-rose-50/20'
@@ -840,10 +826,7 @@ Front Desk Walk-in,manual,Counter Tablet #1,Customer pre-ordered 2 custom birthd
           {/* Submission Info Notice */}
           <div className="p-2.5 rounded-lg bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 text-[11px] flex items-center gap-2">
             <Info className="w-3.5 h-3.5 shrink-0 text-blue-500" />
-            <span>
-              Submitted messages receive a temporary local ID and start with{' '}
-              <strong className="text-slate-800 dark:text-slate-200">Not Analyzed</strong> status.
-            </span>
+            <span>{t('add.notAnalyzedInfo')}</span>
           </div>
 
           {/* Footer Buttons */}
@@ -854,7 +837,7 @@ Front Desk Walk-in,manual,Counter Tablet #1,Customer pre-ordered 2 custom birthd
               disabled={isSubmitting}
               className="px-4 py-2 text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
             <button
               type="submit"
@@ -864,17 +847,17 @@ Front Desk Walk-in,manual,Counter Tablet #1,Customer pre-ordered 2 custom birthd
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span>Adding to Inbox...</span>
+                  <span>{t('add.adding')}</span>
                 </>
               ) : csvParsedRows.length > 0 ? (
                 <>
                   <FileSpreadsheet className="w-3.5 h-3.5" />
-                  <span>Import {csvParsedRows.length} Messages</span>
+                  <span>{t('add.importMessages', { count: csvParsedRows.length })}</span>
                 </>
               ) : (
                 <>
                   <Check className="w-3.5 h-3.5" />
-                  <span>Add to Inbox</span>
+                  <span>{t('add.addToInbox')}</span>
                 </>
               )}
             </button>

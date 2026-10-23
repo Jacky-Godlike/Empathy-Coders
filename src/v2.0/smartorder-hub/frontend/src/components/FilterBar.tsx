@@ -1,6 +1,8 @@
 import React from 'react';
 import { Search, X, Filter, RotateCcw } from 'lucide-react';
 import { MessageSource, RecognitionStatus } from '../types/message';
+import { MESSAGE_SOURCES, SOURCE_LABEL_KEYS } from '../config/sources';
+import { useI18n } from '../i18n/I18nContext';
 
 interface FilterBarProps {
   searchQuery: string;
@@ -25,27 +27,29 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   totalFiltered,
   totalCount,
 }) => {
-  const isFiltered = searchQuery !== '' || sourceFilter !== 'all' || statusFilter !== 'all';
+  const { t } = useI18n();
+  const isFiltered =
+    searchQuery !== '' || sourceFilter !== 'all' || statusFilter !== 'all';
 
   const sourceOptions: { value: MessageSource | 'all'; label: string }[] = [
-    { value: 'all', label: 'All Sources' },
-    { value: 'whatsapp', label: 'WhatsApp' },
-    { value: 'email', label: 'Email' },
-    { value: 'manual', label: 'Manual Entry' },
+    { value: 'all', label: t('filter.allSources') },
+    ...MESSAGE_SOURCES.map((source) => ({
+      value: source,
+      label: t(SOURCE_LABEL_KEYS[source]),
+    })),
   ];
 
   const statusOptions: { value: RecognitionStatus | 'all'; label: string }[] = [
-    { value: 'all', label: 'All Statuses' },
-    { value: 'not_analyzed', label: 'Not Analyzed' },
-    { value: 'processing', label: 'Processing' },
-    { value: 'recognized_as_order', label: 'Recognized as Order' },
-    { value: 'needs_human_review', label: 'Needs Human Review' },
-    { value: 'not_an_order', label: 'Not an Order' },
+    { value: 'all', label: t('filter.allStatuses') },
+    { value: 'not_analyzed', label: t('status.not_analyzed') },
+    { value: 'processing', label: t('status.processing') },
+    { value: 'recognized_as_order', label: t('status.recognized_as_order') },
+    { value: 'needs_human_review', label: t('status.needs_human_review') },
+    { value: 'not_an_order', label: t('status.not_an_order') },
   ];
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 mb-5 shadow-xs space-y-3.5">
-      {/* Top row: Search input & quick summary */}
       <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
         <div className="relative flex-1">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -53,14 +57,14 @@ export const FilterBar: React.FC<FilterBarProps> = ({
             type="text"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Search by sender, message content, or keywords..."
+            placeholder={t('filter.searchPlaceholder')}
             className="w-full pl-10 pr-10 py-2 text-sm bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 transition"
           />
           {searchQuery && (
             <button
               onClick={() => onSearchChange('')}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5"
-              title="Clear search"
+              title={t('filter.clearSearch')}
             >
               <X className="w-4 h-4" />
             </button>
@@ -68,10 +72,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
         </div>
 
         <div className="flex items-center justify-between sm:justify-end gap-2 text-xs text-slate-500 dark:text-slate-400">
-          <span>
-            Showing <strong className="text-slate-900 dark:text-slate-200 font-semibold">{totalFiltered}</strong> of{' '}
-            {totalCount} messages
-          </span>
+          <span>{t('filter.showing', { filtered: totalFiltered, total: totalCount })}</span>
           {isFiltered && (
             <button
               onClick={onResetFilters}
@@ -79,20 +80,18 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-md transition"
             >
               <RotateCcw className="w-3 h-3" />
-              Reset filters
+              {t('filter.reset')}
             </button>
           )}
         </div>
       </div>
 
-      {/* Bottom row: Filter Dropdowns / Pills */}
       <div className="flex flex-wrap items-center gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-800/80">
         <div className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 mr-1">
           <Filter className="w-3.5 h-3.5" />
-          <span>Filters:</span>
+          <span>{t('filter.filters')}</span>
         </div>
 
-        {/* Source Filter Tabs */}
         <div className="flex flex-wrap items-center gap-1">
           {sourceOptions.map((opt) => {
             const active = sourceFilter === opt.value;
@@ -115,10 +114,9 @@ export const FilterBar: React.FC<FilterBarProps> = ({
 
         <span className="text-slate-300 dark:text-slate-700 hidden sm:inline">|</span>
 
-        {/* Status Filter Dropdown / Selector */}
         <div className="flex items-center gap-1.5">
           <label htmlFor="status-select" className="text-xs text-slate-500 dark:text-slate-400">
-            Status:
+            {t('filter.status')}
           </label>
           <select
             id="status-select"

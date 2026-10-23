@@ -19,13 +19,6 @@ from __future__ import annotations
 import re
 from datetime import datetime
 
-BAND_THRESHOLDS = (
-    (75, "Critical"),
-    (50, "High"),
-    (25, "Medium"),
-    (0, "Low"),
-)
-
 FACTOR_LABELS = {
     "stock": "Stock / capacity",
     "delivery": "Delivery feasibility",
@@ -35,10 +28,18 @@ FACTOR_LABELS = {
 }
 
 
-def _band(score: float) -> str:
-    for threshold, label in BAND_THRESHOLDS:
-        if score >= threshold:
-            return label
+def _band(
+    score: float,
+    medium_threshold: float,
+    high_threshold: float,
+    critical_threshold: float,
+) -> str:
+    if score >= critical_threshold:
+        return "Critical"
+    if score >= high_threshold:
+        return "High"
+    if score >= medium_threshold:
+        return "Medium"
     return "Low"
 
 
@@ -111,6 +112,10 @@ def assess_risk(
     min_margin: float,
     warn_margin: float,
     high_value_threshold: float,
+    min_confidence: float = 0.8,
+    risk_medium_threshold: float = 25,
+    risk_high_threshold: float = 50,
+    risk_critical_threshold: float = 75,
 ) -> dict:
     capacity_blocked = _capacity_blocked(order, industry, products)
     no_deposit = _no_deposit(order, industry)
@@ -121,7 +126,7 @@ def assess_risk(
     data_score = min(
         100.0,
         len(missing_fields) * 32
-        + max(0.0, (0.70 - float(confidence or 0)) * 100),
+        + max(0.0, (min_confidence - float(confidence or 0)) * 100),
     )
 
     # 2. Stock or capacity.
@@ -242,9 +247,10 @@ def assess_risk(
         "delivery": delivery_detail,
         "margin": margin_detail,
         "data": (
-            "All required fields are present."
-            if not missing_fields
-            else f"{len(missing_fields)} field(s) missing."
+            f"{len(missing_fields)} field(s) missing; "
+            f"confidence {confidence:.0%} vs {min_confidence:.0%} minimum."
+            if missing_fields or confidence < min_confidence
+            else "Required fields are present and extraction confidence is acceptable."
         ),
         "anomaly": anomaly_detail,
     }
@@ -286,7 +292,12 @@ def assess_risk(
 
     return {
         "score": composite,
-        "band": _band(composite),
+        "band": _band(
+            composite,
+            risk_medium_threshold,
+            risk_high_threshold,
+            risk_critical_threshold,
+        ),
         "factors": factors,
         "warnings": warnings,
         "capacityBlocked": capacity_blocked,

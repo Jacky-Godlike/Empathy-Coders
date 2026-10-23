@@ -1,6 +1,7 @@
 import React from 'react';
 import { Inbox, Clock, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { OrderMessage, RecognitionStatus } from '../types/message';
+import { useI18n } from '../i18n/I18nContext';
 
 interface StatsOverviewProps {
   messages: OrderMessage[];
@@ -13,6 +14,7 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({
   currentStatusFilter,
   onSelectStatusFilter,
 }) => {
+  const { t } = useI18n();
   const total = messages.length;
   const pending = messages.filter((m) => m.status === 'not_analyzed').length;
   const recognized = messages.filter((m) => m.status === 'recognized_as_order').length;
@@ -20,7 +22,7 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({
 
   const cards = [
     {
-      title: 'Total Inbound Messages',
+      title: t('stats.total'),
       value: total,
       icon: Inbox,
       filter: 'all' as const,
@@ -29,7 +31,7 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({
       activeBorder: 'ring-2 ring-slate-900 dark:ring-white',
     },
     {
-      title: 'Pending Analysis',
+      title: t('stats.pending'),
       value: pending,
       icon: Clock,
       filter: 'not_analyzed' as const,
@@ -38,7 +40,7 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({
       activeBorder: 'ring-2 ring-blue-600',
     },
     {
-      title: 'Recognized Orders',
+      title: t('stats.recognized'),
       value: recognized,
       icon: CheckCircle2,
       filter: 'recognized_as_order' as const,
@@ -47,7 +49,7 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({
       activeBorder: 'ring-2 ring-emerald-600',
     },
     {
-      title: 'Needs Human Review',
+      title: t('stats.review'),
       value: review,
       icon: AlertTriangle,
       filter: 'needs_human_review' as const,
@@ -86,7 +88,7 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({
               </span>
               {isActive && (
                 <span className="text-[10px] font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
-                  Filtered
+                  {t('stats.filtered')}
                 </span>
               )}
             </div>

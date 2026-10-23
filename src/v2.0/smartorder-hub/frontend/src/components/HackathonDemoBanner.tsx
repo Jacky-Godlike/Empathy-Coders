@@ -1,15 +1,19 @@
 import React, { useState } from 'react';
-import { Sparkles, Info, X, RotateCcw } from 'lucide-react';
+import { Sparkles, Info, X, RotateCcw, Cable } from 'lucide-react';
+import { useI18n } from '../i18n/I18nContext';
 
 interface HackathonDemoBannerProps {
   onResetData: () => void;
+  onOpenChannels: () => void;
   isResetting: boolean;
 }
 
 export const HackathonDemoBanner: React.FC<HackathonDemoBannerProps> = ({
   onResetData,
+  onOpenChannels,
   isResetting,
 }) => {
+  const { t } = useI18n();
   const [isDismissed, setIsDismissed] = useState(false);
 
   if (isDismissed) return null;
@@ -25,42 +29,46 @@ export const HackathonDemoBanner: React.FC<HackathonDemoBannerProps> = ({
               <Sparkles className="w-3 h-3 text-amber-300" />
               SDC Hackathon 2026 · Domain 2
             </span>
-            <span className="text-xs text-amber-100/80">Live pipeline</span>
+            <span className="text-xs text-amber-100/80">{t('banner.livePipeline')}</span>
           </div>
 
           <h3 className="text-sm sm:text-base font-semibold text-white">
-            Message → extraction → stock check → human approval → order
+            {t('banner.flow')}
           </h3>
 
-          <p className="text-xs text-slate-300 leading-relaxed">
-            Paste a WhatsApp or email order, extract the fields with AI (rules
-            fallback if the API is unavailable), then review the stock,
-            margin and delivery-date checks before the owner approves. Every
-            action is written to the activity log.
-          </p>
+          <p className="text-xs text-slate-300 leading-relaxed">{t('banner.body')}</p>
 
           <p className="text-[11px] text-slate-400 flex items-center gap-1.5">
             <Info className="w-3 h-3" />
-            Synthetic data only. No real customer, supplier or payment data.
+            {t('banner.notice')}
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 shrink-0">
           <button
+            onClick={onOpenChannels}
+            type="button"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-100 transition border border-emerald-300/20"
+          >
+            <Cable className="w-3.5 h-3.5" />
+            <span>{t('banner.manageChannels')}</span>
+          </button>
+
+          <button
             onClick={onResetData}
             disabled={isResetting}
             type="button"
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white/10 hover:bg-white/20 text-white transition border border-white/10"
-            title="Reset inbox, orders and activity to the demo seed"
+            title={t('banner.resetTitle')}
           >
             <RotateCcw className={`w-3.5 h-3.5 ${isResetting ? 'animate-spin' : ''}`} />
-            <span>Reset demo data</span>
+            <span>{t('banner.reset')}</span>
           </button>
 
           <button
             onClick={() => setIsDismissed(true)}
             className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition"
-            title="Dismiss banner"
+            title={t('banner.dismiss')}
           >
             <X className="w-4 h-4" />
           </button>

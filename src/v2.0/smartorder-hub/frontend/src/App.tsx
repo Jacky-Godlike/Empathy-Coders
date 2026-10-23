@@ -36,8 +36,11 @@ import { OrdersView } from './components/OrdersView';
 import { ActivityView } from './components/ActivityView';
 import { CatalogView } from './components/CatalogView';
 import { SettingsView } from './components/SettingsView';
+import { ChannelHubView } from './components/ChannelHubView';
+import { useI18n } from './i18n/I18nContext';
 
 export default function App() {
+  const { t, language } = useI18n();
   const [messages, setMessages] = useState<OrderMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -84,6 +87,11 @@ export default function App() {
   );
 
   useEffect(() => {
+    document.title = t('meta.title');
+    document.documentElement.lang = language === 'zh' ? 'zh-CN' : language === 'ms' ? 'ms' : 'en';
+  }, [language, t]);
+
+  useEffect(() => {
     try {
       window.localStorage.setItem(
         'smartorderhub.currentUser',
@@ -99,12 +107,12 @@ export default function App() {
       setCurrentUser(user);
       showToast(
         user.role === 'owner'
-          ? `Signed in as ${user.name}. Order approval enabled.`
-          : `Signed in as ${user.name}. View-only mode.`,
+          ? t('header.signedInOwner', { name: user.name })
+          : t('header.signedInStaff', { name: user.name }),
         user.role === 'owner' ? 'success' : 'info'
       );
     },
-    [showToast]
+    [showToast, t]
   );
 
   const loadMessages = useCallback(async (isSilent = false) => {
@@ -117,9 +125,7 @@ export default function App() {
       setMessages(data);
     } catch (err: unknown) {
       setErrorMessage(
-        err instanceof Error
-          ? err.message
-          : 'Failed to retrieve messages from the order inbox.'
+        err instanceof Error ? err.message : t('app.error.load')
       );
     } finally {
       setIsLoading(false);
@@ -135,7 +141,7 @@ export default function App() {
       setWorkspace(data);
     } catch (err: unknown) {
       setWorkspaceError(
-        err instanceof Error ? err.message : 'Could not load the workspace'
+        err instanceof Error ? err.message : t('app.workspaceLoadError')
       );
     } finally {
       setIsWorkspaceLoading(false);
@@ -174,23 +180,16 @@ export default function App() {
       setMessages((prev) => prev.map((msg) => (msg.id === id ? updated : msg)));
       setSelectedMessage((current) => (current?.id === id ? updated : current));
 
-      const statusLabels: Record<RecognitionStatus, string> = {
-        not_analyzed: 'Not analyzed',
-        processing: 'Processing',
-        recognized_as_order: 'Recognized as order',
-        not_an_order: 'Not an order',
-        needs_human_review: 'Needs human review',
-      };
-
       showToast(
-        `Extraction complete: ${statusLabels[updated.status]} (${
-          updated.parsedData?.method === 'ai' ? 'AI' : 'rules'
-        }).`,
+        t('app.extractionComplete', {
+          status: t(`status.${updated.status}`),
+          method: updated.parsedData?.method === 'ai' ? t('orders.ai') : t('orders.rules'),
+        }),
         updated.status === 'recognized_as_order' ? 'success' : 'info'
       );
       refreshWorkspace();
     } catch (err: unknown) {
-      showToast(err instanceof Error ? err.message : 'Extraction failed', 'error');
+      showToast(err instanceof Error ? err.message : t('app.error.analyze'), 'error');
     } finally {
       setProcessingIds((prev) => {
         const next = new Set(prev);
@@ -203,38 +202,47 @@ export default function App() {
   const handleAddMessage = async (input: NewMessageInput) => {
     const created = await messagesApi.createMessage(input);
     setMessages((prev) => [created, ...prev]);
-    showToast(`Inbound message from "${created.sender}" added to the inbox.`, 'success');
+    showToast(t('app.toast.added', { sender: created.sender }), 'success');
     refreshWorkspace();
   };
 
   const handleBatchImport = async (inputs: NewMessageInput[]) => {
     const createdList = await messagesApi.importMessagesBatch(inputs);
     setMessages((prev) => [...createdList, ...prev]);
-    showToast(`Imported ${createdList.length} messages from file.`, 'success');
+    showToast(t('app.toast.imported', { count: createdList.length }), 'success');
     refreshWorkspace();
   };
 
   const handleUpdateStatus = async (
     id: string,
     newStatus: RecognitionStatus,
-    notes?: string
+    notes?: string,
+    extractionAccurate?: boolean
   ) => {
-    const updated = await messagesApi.updateMessageStatus(id, newStatus, notes);
+    const updated = await messagesApi.updateMessageStatus(
+      id,
+      newStatus,
+      notes,
+      extractionAccurate
+    );
     setMessages((prev) => prev.map((msg) => (msg.id === id ? updated : msg)));
     setSelectedMessage((current) => (current?.id === id ? updated : current));
-    showToast(`Status updated to "${newStatus.replace(/_/g, ' ')}".`, 'info');
+    showToast(
+      t('app.toast.status', { status: t(`status.${newStatus}`) }),
+      'info'
+    );
   };
 
   const handleDeleteMessage = async (id: string) => {
-    if (window.confirm('Delete this message? The activity log will keep a record.')) {
+    if (window.confirm(t('app.deleteConfirm'))) {
       try {
         await messagesApi.deleteMessage(id);
         setMessages((prev) => prev.filter((message) => message.id !== id));
         if (selectedMessage?.id === id) setSelectedMessage(null);
-        showToast('Message deleted.', 'info');
+        showToast(t('app.toast.deleted'), 'info');
         refreshWorkspace();
       } catch (err: unknown) {
-        showToast(err instanceof Error ? err.message : 'Delete failed', 'error');
+        showToast(err instanceof Error ? err.message : t('app.deleteFailed'), 'error');
       }
     }
   };
@@ -252,9 +260,9 @@ export default function App() {
       setView('desk');
       setOrdersVersion((value) => value + 1);
       await refreshWorkspace();
-      showToast('Demo data reset to the synthetic seed.', 'info');
+      showToast(t('app.toast.reset'), 'info');
     } catch (err: unknown) {
-      showToast(err instanceof Error ? err.message : 'Reset failed', 'error');
+      showToast(err instanceof Error ? err.message : t('app.resetFailed'), 'error');
       throw err;
     } finally {
       setIsResetting(false);
@@ -297,10 +305,10 @@ export default function App() {
       setReviewOrder(order);
       setOrdersVersion((value) => value + 1);
       refreshWorkspace();
-      showToast(`Order ${order.id} is ready for human review.`, 'success');
+      showToast(t('app.orderReady', { id: order.id }), 'success');
     } catch (err: unknown) {
       showToast(
-        err instanceof Error ? err.message : 'Could not create the order',
+        err instanceof Error ? err.message : t('app.createOrderError'),
         'error'
       );
     } finally {
@@ -314,9 +322,21 @@ export default function App() {
       setReviewOrder(full);
       setOrdersVersion((value) => value + 1);
     } catch (err: unknown) {
-      showToast(err instanceof Error ? err.message : 'Could not open order', 'error');
+      showToast(err instanceof Error ? err.message : t('app.openOrderError'), 'error');
     }
   };
+
+  const handleChannelMessages = useCallback(
+    (incoming: OrderMessage[]) => {
+      if (incoming.length === 0) return;
+      setMessages((previous) => {
+        const incomingIds = new Set(incoming.map((message) => message.id));
+        return [...incoming, ...previous.filter((message) => !incomingIds.has(message.id))];
+      });
+      refreshWorkspace();
+    },
+    [refreshWorkspace]
+  );
 
   const handleOrderUpdated = (updated: Order) => {
     setReviewOrder(updated);
@@ -358,7 +378,7 @@ export default function App() {
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-700 flex items-center justify-center text-white mx-auto shadow-lg shadow-emerald-900/30">
             <Layers className="w-6 h-6" />
           </div>
-          <h1 className="text-lg font-bold text-slate-900">SmartOrder Hub</h1>
+          <h1 className="text-lg font-bold text-slate-900">{t('app.loadingTitle')}</h1>
           {workspaceError ? (
             <>
               <p className="text-xs text-rose-700 flex items-center justify-center gap-1.5">
@@ -373,13 +393,13 @@ export default function App() {
                 {isWorkspaceLoading ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 ) : null}
-                Retry connection
+                {t('app.retryConnection')}
               </button>
             </>
           ) : (
             <p className="text-xs text-slate-500 flex items-center justify-center gap-2">
               <Loader2 className="w-4 h-4 animate-spin" />
-              Loading the synthetic workspace…
+              {t('app.loadingWorkspace')}
             </p>
           )}
         </div>
@@ -424,6 +444,8 @@ export default function App() {
         <MainSidebar
           workspace={workspace}
           view={view}
+          currentUser={currentUser}
+          onChangeUser={handleChangeUser}
           onNavigate={setView}
           isOpenMobile={isMobileSidebarOpen}
           onCloseMobile={() => setIsMobileSidebarOpen(false)}
@@ -445,6 +467,7 @@ export default function App() {
               <>
                 <HackathonDemoBanner
                   onResetData={handleResetData}
+                  onOpenChannels={() => setView('channels')}
                   isResetting={isResetting}
                 />
 
@@ -453,7 +476,7 @@ export default function App() {
                     <div className="flex items-start gap-2.5">
                       <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
                       <div>
-                        <h4 className="font-semibold">Inbox error</h4>
+                        <h4 className="font-semibold">{t('app.inboxError')}</h4>
                         <p className="text-xs mt-0.5">{errorMessage}</p>
                       </div>
                     </div>
@@ -461,7 +484,7 @@ export default function App() {
                       onClick={() => loadMessages()}
                       className="px-3 py-1 bg-rose-600 text-white rounded-lg text-xs font-semibold hover:bg-rose-700 transition"
                     >
-                      Retry
+                      {t('common.retry')}
                     </button>
                   </div>
                 )}
@@ -530,12 +553,12 @@ export default function App() {
                       <FilterX className="w-6 h-6" />
                     </div>
                     <h3 className="text-base font-semibold text-slate-900 dark:text-white">
-                      No order messages found
+                      {t('app.empty.title')}
                     </h3>
                     <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
                       {searchQuery || sourceFilter !== 'all' || statusFilter !== 'all'
-                        ? 'No messages matched your current search filters. Try clearing or relaxing your filters.'
-                        : 'Your order inbox is currently empty. Use "Add Message" to log an order or import a file.'}
+                        ? t('app.empty.filtered')
+                        : t('app.empty.default')}
                     </p>
                     <div className="pt-2 flex justify-center gap-3">
                       {searchQuery || sourceFilter !== 'all' || statusFilter !== 'all' ? (
@@ -547,20 +570,33 @@ export default function App() {
                           }}
                           className="px-4 py-2 text-xs font-semibold text-blue-600 bg-blue-50 dark:bg-blue-950/60 rounded-lg hover:bg-blue-100 transition"
                         >
-                          Clear all filters
+                          {t('filter.clearAll')}
                         </button>
                       ) : (
                         <button
                           onClick={() => setIsAddModalOpen(true)}
                           className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition"
                         >
-                          + Add Message
+                          + {t('message.add')}
                         </button>
                       )}
                     </div>
                   </div>
                 )}
               </>
+            )}
+
+            {view === 'channels' && (
+              <ChannelHubView
+                currentUser={currentUser}
+                onMessagesIngested={handleChannelMessages}
+                onOpenInbox={() => {
+                  setSourceFilter('all');
+                  setStatusFilter('all');
+                  setView('inbox');
+                }}
+                onNotify={showToast}
+              />
             )}
 
             {view === 'desk' && (

@@ -30,7 +30,12 @@ HIGH_VALUE_THRESHOLD = float(
     os.getenv("SMARTORDERHUB_HIGH_VALUE_THRESHOLD", "1000")
 )
 LEAD_TIME_BUFFER_DAYS = int(os.getenv("SMARTORDERHUB_LEAD_TIME_BUFFER_DAYS", "1"))
-MIN_CONFIDENCE = float(os.getenv("SMARTORDERHUB_MIN_CONFIDENCE", "0.70"))
+MIN_CONFIDENCE = float(os.getenv("SMARTORDERHUB_MIN_CONFIDENCE", "0.80"))
+RISK_MEDIUM_THRESHOLD = float(os.getenv("SMARTORDERHUB_RISK_MEDIUM_THRESHOLD", "25"))
+RISK_HIGH_THRESHOLD = float(os.getenv("SMARTORDERHUB_RISK_HIGH_THRESHOLD", "50"))
+RISK_CRITICAL_THRESHOLD = float(
+    os.getenv("SMARTORDERHUB_RISK_CRITICAL_THRESHOLD", "75")
+)
 
 # AI is optional. When the key is absent, extraction falls back to rules.
 # "gemini" is the default provider. Set AI_PROVIDER=openai to use any
@@ -60,3 +65,7 @@ AI_TIMEOUT_SECONDS = float(os.getenv("AI_TIMEOUT_SECONDS", "30"))
 INTAKE_MODE = os.getenv("SMARTORDERHUB_INTAKE_MODE", "rules").lower()
 if INTAKE_MODE not in ("auto", "ai", "rules"):
     INTAKE_MODE = "rules"
+
+# Channel collection. Set a token in production so webhook calls can be
+# authenticated with X-Webhook-Token. Leave empty for the local demo.
+CHANNEL_WEBHOOK_TOKEN = os.getenv("SMARTORDERHUB_CHANNEL_WEBHOOK_TOKEN", "")

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Clock, Loader2, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
 import { RecognitionStatus } from '../types/message';
+import { useI18n } from '../i18n/I18nContext';
 
 interface StatusBadgeProps {
   status: RecognitionStatus;
@@ -8,6 +9,8 @@ interface StatusBadgeProps {
 }
 
 export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, size = 'md' }) => {
+  const { t } = useI18n();
+
   const configs: Record<
     RecognitionStatus,
     {
@@ -21,7 +24,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, size = 'md' })
     }
   > = {
     not_analyzed: {
-      label: 'Not Analyzed',
+      label: t('status.not_analyzed'),
       icon: Clock,
       bg: 'bg-slate-100 dark:bg-slate-800',
       text: 'text-slate-700 dark:text-slate-300',
@@ -29,7 +32,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, size = 'md' })
       iconColor: 'text-slate-500 dark:text-slate-400',
     },
     processing: {
-      label: 'Processing',
+      label: t('status.processing'),
       icon: Loader2,
       bg: 'bg-blue-50 dark:bg-blue-950/50',
       text: 'text-blue-700 dark:text-blue-300',
@@ -38,7 +41,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, size = 'md' })
       pulse: true,
     },
     recognized_as_order: {
-      label: 'Recognized as Order',
+      label: t('status.recognized_as_order'),
       icon: CheckCircle2,
       bg: 'bg-emerald-50 dark:bg-emerald-950/50',
       text: 'text-emerald-800 dark:text-emerald-300',
@@ -46,7 +49,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, size = 'md' })
       iconColor: 'text-emerald-600 dark:text-emerald-400',
     },
     not_an_order: {
-      label: 'Not an Order',
+      label: t('status.not_an_order'),
       icon: XCircle,
       bg: 'bg-rose-50 dark:bg-rose-950/50',
       text: 'text-rose-700 dark:text-rose-300',
@@ -54,7 +57,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, size = 'md' })
       iconColor: 'text-rose-500 dark:text-rose-400',
     },
     needs_human_review: {
-      label: 'Needs Human Review',
+      label: t('status.needs_human_review'),
       icon: AlertTriangle,
       bg: 'bg-amber-50 dark:bg-amber-950/50',
       text: 'text-amber-800 dark:text-amber-300',

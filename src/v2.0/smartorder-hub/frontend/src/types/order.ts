@@ -15,6 +15,7 @@ export type OrderStatus =
 export type AppView =
   | 'desk'
   | 'inbox'
+  | 'channels'
   | 'orders'
   | 'activity'
   | 'catalog'
@@ -64,7 +65,18 @@ export interface Analysis {
   riskScore: number;
   rawRiskScore?: number;
   riskBand: RiskBand;
+  scoreThresholds?: { medium: number; high: number; critical: number };
+  assessmentLayer?: 'information_missing' | 'hard_block' | 'weighted_review' | 'low_risk_precheck';
   riskFactors: RiskFactor[];
+  riskTriggers?: Array<{ code: string; category: string; detail: string }>;
+  responseActions?: Array<{
+    strategy: 'avoid' | 'transfer' | 'mitigate' | 'accept' | 'escalate';
+    action: string;
+    suggestedReply?: string;
+    earliestCommitDate?: string;
+  }>;
+  complianceBlocked?: boolean;
+  informationMissing?: boolean;
   daysUntilDelivery: number | null;
   missingFields: string[];
   confidence: number;
@@ -104,15 +116,22 @@ export interface Approval {
   role: string;
   note: string;
   override?: boolean;
+  specialReason?: 'strategic_customer' | 'clear_inventory' | 'new_process' | 'other';
   decidedAt: string;
+}
+
+export interface ActualOutcome {
+  actualDeliveredOnTime?: boolean;
+  actualProfit?: number;
+  updatedAt?: string;
 }
 
 export interface Order {
   id: string;
   messageId: string;
-  source: 'whatsapp' | 'email' | 'manual';
+  source: 'whatsapp' | 'facebook' | 'instagram' | 'telegram' | 'email' | 'tiktok' | 'manual';
   industry: string;
-  industryFields: Record<string, string>;
+  industryFields: Record<string, string | null>;
   extractionMethod?: 'ai' | 'rules';
   customerName: string;
   contact?: string;
@@ -125,6 +144,7 @@ export interface Order {
   status: OrderStatus;
   analysis?: Analysis;
   approval?: Approval;
+  actualOutcome?: ActualOutcome;
   purchaseDrafts: PurchaseDraft[];
   createdAt: string;
   updatedAt: string;
@@ -147,6 +167,7 @@ export interface DecisionInput {
   role: 'staff' | 'manager' | 'owner';
   note: string;
   override?: boolean;
+  specialReason?: 'strategic_customer' | 'clear_inventory' | 'new_process' | 'other';
 }
 
 export interface DecisionResponse {
@@ -213,6 +234,9 @@ export interface Workspace {
     highValueThreshold: number;
     leadTimeBufferDays: number;
     minConfidence: number;
+    riskMediumThreshold: number;
+    riskHighThreshold: number;
+    riskCriticalThreshold: number;
   };
   stats: IntakeSummary;
 }
@@ -234,4 +258,35 @@ export interface IntakeProcessResult {
   processed: number;
   ordersCreated: number;
   byType: Record<string, number>;
+}
+
+export interface RiskReport {
+  period: 'week' | 'month';
+  generatedAt: string;
+  ordersReviewed: number;
+  riskTriggerTop5: Array<{
+    category: string;
+    count: number;
+    examples: string[];
+  }>;
+  specialApprovals: Array<{
+    orderId: string;
+    reason?: string;
+    expectedProfit?: number;
+    actualProfit?: number;
+    actualDeliveredOnTime?: boolean;
+  }>;
+  specialApprovalExpectedProfit: number;
+  specialApprovalActualProfit: number;
+  extractionAccuracy: {
+    reviewed: number;
+    accurate: number;
+    rate: number | null;
+  };
+  extractionAccuracyTrend: Array<{
+    label: string;
+    reviewed: number;
+    accurate: number;
+    rate: number | null;
+  }>;
 }

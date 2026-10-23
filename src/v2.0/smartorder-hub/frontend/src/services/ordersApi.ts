@@ -5,6 +5,7 @@ import {
   IntakeProcessResult,
   IntakeSummary,
   Order,
+  RiskReport,
 } from '../types/order';
 import { API_BASE, apiRequest } from './http';
 
@@ -26,6 +27,22 @@ export function fetchOrders(): Promise<Order[]> {
 
 export function fetchOrder(orderId: string): Promise<Order> {
   return apiRequest<Order>(`/api/orders/${orderId}`);
+}
+
+export function recordOrderOutcome(
+  orderId: string,
+  outcome: { actualDeliveredOnTime?: boolean; actualProfit?: number }
+): Promise<Order> {
+  return apiRequest<Order>(`/api/orders/${orderId}/outcome`, {
+    method: 'PATCH',
+    body: JSON.stringify(outcome),
+  });
+}
+
+export function fetchRiskReport(
+  period: 'week' | 'month'
+): Promise<RiskReport> {
+  return apiRequest<RiskReport>(`/api/reports/risk?period=${period}`);
 }
 
 export function decideOrder(

@@ -2,11 +2,13 @@
 
 **Smart order consolidation and approval for Malaysian SMEs.**
 
-SmartOrder Hub turns a WhatsApp, email or manually pasted order into a reviewed
-order record. It extracts the fields, checks the catalog, stock, supplier lead
-time, revenue and margin, then sends the decision to the owner. Nothing is
-accepted automatically. Every step is written to an activity log.
+SmartOrder Hub collects customer messages from WhatsApp, Facebook Messenger,
+Instagram, Telegram, email and TikTok, turns them into reviewed order records,
+checks the catalog, stock, supplier lead time, revenue and margin, then sends
+the decision to the owner. Nothing is accepted automatically. Every step is
+written to an activity log.
 
+The interface is available in **English, Simplified Chinese and Bahasa Melayu**.
 This is a proof of concept for **SDC Hackathon 2026, Domain 2: Orbyte Smart SME
 Challenge**. All customer, product, supplier and order data is synthetic.
 
@@ -57,7 +59,8 @@ The left navigation mirrors an order desk:
 | Section | What it is for |
 |---|---|
 | **Order Desk** | The clean order table; the primary demo screen |
-| **Inbox** | Raw WhatsApp/email messages, classification and re-extraction |
+| **Inbox** | Raw channel messages, classification and re-extraction |
+| **Channel Hub** | WhatsApp, Messenger, Instagram, Telegram, email and TikTok collection |
 | **Orders & purchases** | Approved records, purchase drafts and exports |
 | **Activity log** | Every import, extraction, analysis, decision and draft |
 | **Catalog & stock** | Products, safety stock, suppliers and lead times |
@@ -68,7 +71,7 @@ in the four risk bands (Low, Medium, High, Critical), with counts and
 percentages in the legend. It sits beside the intake summary cards and updates
 after every intake or industry switch.
 
-Rows in the **High** or **Critical** band also show a **View analysis** button.
+Rows in the **Medium**, **High** or **Critical** band also show a **View analysis** button.
 It opens the same order modal used for review, with the five factor scores,
 weights, weighted contribution, stock lines, margin and activity trail.
 
@@ -104,7 +107,9 @@ The first three cases are the ones to show in the 5–7 minute video.
 | Real in this prototype | Simulated / mock |
 |---|---|
 | React UI, FastAPI API, JSON persistence | Login and identity provider |
-| Rule extraction with dates, quantities, addresses and aliases | WhatsApp / email connectors |
+| Six-channel inbox, connect/sync state, normalised webhook endpoint | Live platform OAuth, signed platform payloads and background polling |
+| Rule extraction with dates, quantities, addresses and aliases | WhatsApp / email connectors (demo adapters) |
+| English, Simplified Chinese and Bahasa Melayu UI | Translation of incoming customer messages or backend audit text |
 | AI extraction through Gemini or an OpenAI-compatible API (optional) | Orbyte platform (mock adapter) |
 | Stock, safety stock, supplier lead time, MOQ, margin math | Payment, e-invoice and statutory filing |
 | Six industry profiles with synthetic per-industry datasets | Real industry benchmarks or customer records |
@@ -125,13 +130,15 @@ Purchase drafts are never sent to a supplier.
 │ Vite + Tailwind CSS 4            │
 │                                  │
 │ Order Desk · Risk mix pie        │
-│ Inbox · Orders & purchases       │
-│ Activity · Catalog · Settings    │
+│ Inbox · Channel Hub              │
+│ Orders & purchases · Activity    │
+│ Catalog · Settings · EN/ZH/MS    │
 └───────────────┬──────────────────┘
                 │ /api (JSON)
 ┌───────────────▼──────────────────┐
 │ FastAPI                          │
 │                                  │
+│ channels.py     ── six platforms │
 │ ai_client.py    ── provider seam │
 │ extraction.py   ── AI + rules    │
 │ industries.py   ── 6 profiles    │
@@ -160,6 +167,7 @@ smartorder-hub/
 ├── backend/
 │   ├── app/
 │   │   ├── main.py            # API routes and static hosting
+│   │   ├── channels.py        # six channel definitions + demo sample bank
 │   │   ├── ai_client.py       # provider-neutral AI seam + connection test
 │   │   ├── extraction.py      # AI prompt + deterministic rule extraction
 │   │   ├── industries.py      # six industry profiles and labels
@@ -172,7 +180,8 @@ smartorder-hub/
 │   │   ├── store.py           # atomic JSON store
 │   │   ├── orbyte_adapter.py  # mock integration seam
 │   │   └── config.py          # thresholds and env vars
-│   ├── tests/test_flow.py     # end-to-end and industry/risk tests
+│   ├── tests/test_flow.py     # end-to-end, industry/risk and channel tests
+│   ├── .env.example           # local configuration template
 │   ├── requirements.txt
 │   └── run.py
 ├── frontend/
@@ -180,19 +189,65 @@ smartorder-hub/
 │       ├── App.tsx
 │       ├── components/
 │       │   ├── MainSidebar.tsx
+│       │   ├── ChannelHubView.tsx
 │       │   ├── OrdersView.tsx
 │       │   ├── RiskPieChart.tsx
 │       │   ├── CatalogView.tsx
 │       │   ├── SettingsView.tsx
 │       │   └── ...            # inbox, review modal, activity
-│       ├── services/          # fetch clients
-│       └── types/
-├── .env.example
+│       ├── i18n/              # EN/ZH/MS dictionaries and provider
+│       ├── services/          # fetch clients incl. channelsApi.ts
+│       └── types/             # order, message and channel types
+├── docs/
+│   └── CHANNEL-INTEGRATION.md # production OAuth/webhook checklist
 └── README.md
 ```
 
 At the repository root, `DEPLOY_REPLIT.md`, `.replit`, `replit.nix` and
 `scripts/` provide the one-command Replit build/run path.
+
+### Channel collection
+
+**Channel Hub** shows six connectors: WhatsApp Business, Facebook Messenger,
+Instagram DM, Telegram Business, an order email inbox and TikTok Business. Each
+card has a connection state, account, last sync, imported count, auto-sync
+preference, sync action and webhook path. A demo notice makes the boundary
+explicit.
+
+- **Sync now** inserts one deterministic sample message from that platform.
+- **Sync all channels** imports one message from every connected channel.
+- Imported messages enter the same inbox, extraction, stock/margin/risk and
+  owner-approval pipeline as manually pasted messages.
+- `POST /api/channels/{id}/webhook` accepts normalised JSON and an optional
+  `X-Webhook-Token`. Duplicate `source` + `externalId` pairs are ignored.
+- Connecting, disconnecting and importing are written to the activity log.
+
+The adapters are **simulated**. They do not call platform APIs or perform OAuth,
+and `autoSync` does not start a background scheduler. The webhook route is real,
+but production still needs platform signature verification, token storage and
+native payload mapping. See
+[`docs/CHANNEL-INTEGRATION.md`](docs/CHANNEL-INTEGRATION.md) for the endpoint
+contract, per-platform scopes and the production security checklist.
+
+### Languages
+
+The UI supports **English (default), Simplified Chinese and Bahasa Melayu**. Use
+the language selector in the top bar (or the compact selector on mobile). The
+choice is stored in `localStorage` under `orderflow_language` and updates
+`<html lang>`.
+
+Translation files:
+
+- `frontend/src/i18n/translations.ts` — shared base dictionary;
+- `frontend/src/i18n/v2Translations.ts` — v2 screens and overrides;
+- `frontend/src/i18n/I18nContext.tsx` — provider and fallback order;
+- `frontend/src/components/LanguageSwitcher.tsx` — selector.
+
+All static UI strings, including source/status/risk labels, are translated.
+Incoming customer messages and backend-generated extraction/analysis/audit text
+stay in the language in which they were recorded; this is deliberate for audit
+fidelity, not a live translation feature. The coverage check can be repeated
+with the team's i18n checker during development.
 
 ---
 
@@ -205,6 +260,7 @@ cd smartorder-hub/backend
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+cp .env.example .env          # optional: edit thresholds / AI / webhook token
 uvicorn app.main:app --reload --port 8000
 ```
 
@@ -325,12 +381,20 @@ Tools Declaration (section 3.2 and 10.6 of the participant handbook).
 |---|---|---|
 | `GET` | `/api/health` | Service status and AI mode |
 | `GET` | `/api/workspace` | Business name, current industry, AI status, rules and counts |
+| `PATCH` | `/api/risk-policy` | Persist validated risk thresholds for new analyses |
 | `GET` | `/api/industries` | The six industry profiles |
 | `POST` | `/api/industry` | Switch industry and reload its synthetic dataset |
 | `GET` | `/api/ai/status` | Whether an AI key is configured, provider/model and intake mode |
 | `POST` | `/api/ai/test` | Make one tiny provider call to verify the key and model |
 | `GET` | `/api/catalog` | Products, suppliers and stock for the current industry |
 | `GET` | `/api/rules` | Current policy thresholds |
+| `GET` | `/api/channels` | Channel connections and public state |
+| `POST` | `/api/channels/{id}/connect` | Connect a channel |
+| `POST` | `/api/channels/{id}/disconnect` | Disconnect a channel |
+| `PATCH` | `/api/channels/{id}` | Update auto-sync preference |
+| `POST` | `/api/channels/{id}/sync` | Import one demo message |
+| `POST` | `/api/channels/sync-all` | Import one message from each connected channel |
+| `POST` | `/api/channels/{id}/webhook` | Normalised inbound message (optional token) |
 | `GET` | `/api/messages` | Raw inbox |
 | `POST` | `/api/messages` | Add a WhatsApp / email / manual message |
 | `POST` | `/api/intake/process` | Classify all unprocessed messages and fill the order table |
@@ -344,7 +408,10 @@ Tools Declaration (section 3.2 and 10.6 of the participant handbook).
 | `POST` | `/api/orders/{id}/analyze` | Run stock, margin and delivery checks |
 | `POST` | `/api/orders/{id}/decision` | `approve`, `reject` or `request_info` |
 | `GET` | `/api/orders/{id}/activity` | Order + message timeline |
+| `PATCH` | `/api/orders/{id}/outcome` | Record actual delivery timeliness and final profit |
+| `GET` | `/api/reports/risk?period=week\|month` | Risk triggers, special-approval results and reviewed extraction accuracy |
 | `GET` | `/api/activity` | Global activity log |
+| `GET` | `/api/audit/verify` | Verify the tamper-evident activity hash chain |
 | `GET` | `/api/orders/export.csv` | CSV export |
 | `GET` | `/api/orders/export.xlsx` | Styled Excel export (one row per line item) |
 | `POST` | `/api/demo/reset` | Reset to the synthetic seed |
@@ -357,16 +424,19 @@ Tools Declaration (section 3.2 and 10.6 of the participant handbook).
   "actor": "Demo Owner",
   "role": "owner",
   "note": "Stock and margin checked.",
-  "override": false
+  "override": false,
+  "specialReason": "strategic_customer"
 }
 ```
 
 The dashboard exposes two identities: **Owner** can approve, reject or request
 information; **Staff** is view-only. If the system recommends `REJECT`,
 `REQUEST_INFO` or `NEEDS_REVIEW`, the owner can approve only with
-`"override": true` **and** a written note. Missing required fields cannot be
-approved at all. The API also accepts the `manager` role for integration tests,
-but the demo UI uses the owner/staff switch.
+`"override": true`, a structured reason (`strategic_customer`,
+`clear_inventory`, `new_process` or `other`) and a written note. Compliance
+blocks and missing required fields cannot be overridden. The API also accepts
+the `manager` role for non-override integration flows, but the demo UI uses the
+owner/staff switch.
 
 ---
 
@@ -442,19 +512,22 @@ Switching profiles resets the demo store, so the UI never mixes two industries.
 
 ## 10. Decision policy
 
-All thresholds live in `config.py` and can be set through environment variables.
-They are business policy, not model output.
+The initial thresholds come from `config.py` / environment variables and are
+then persisted in the workspace policy via **Settings → Decision rules** or
+`PATCH /api/risk-policy`. Changes affect subsequent analyses and are audited.
+Thresholds are business policy, not model output.
 
 | Rule | Condition | Recommendation |
 |---|---|---|
 | Completeness | Missing customer, items, delivery date, or address for a delivery | `REQUEST_INFO` |
 | Industry fields | A required industry field (PO number, cargo weight, material…) is missing | `REQUEST_INFO` |
 | Catalog | A line cannot be matched to a SKU | `NEEDS_REVIEW` |
-| Confidence | Extraction confidence < 70% | `NEEDS_REVIEW` |
+| Confidence | Extraction confidence < 80% (configurable) | `NEEDS_REVIEW` |
+| Compliance | Sensitive restricted-goods keyword is found | Forced manual review; approval override is blocked |
 | Lead time | Shortfall cannot arrive before the requested date | `REJECT` |
 | Margin | Gross margin < 15% | `REJECT` |
 | Replenishment | Shortfall, but supplier lead time + 1 buffer ≤ delivery window | `ACCEPT_WITH_PURCHASE` |
-| Risk | Composite risk is High or Critical, but no earlier rule blocked | `NEEDS_REVIEW` |
+| Risk | Composite risk is Medium or higher, but no earlier rule blocked | `NEEDS_REVIEW` |
 | Default | Everything passes | `ACCEPT` |
 
 **Available stock** = `stock − safetyStock`.
@@ -474,27 +547,52 @@ transparent weighted scorecard in `backend/app/risk.py`.
 score = Σ (factor_score × industry_weight)      # each factor is 0–100
 ```
 
-Five factors:
+Five deterministic factors are evaluated independently before the weighted
+composite; hard blockers and missing information are applied as separate
+decision layers after scoring:
 
 | Factor | What raises the score |
 |---|---|
 | **Stock / capacity** | Shortfall ratio, a line that cannot be replenished in time, no catalog match, or cargo above vehicle capacity (floor 85) |
 | **Delivery feasibility** | Days until delivery minus supplier lead time and the 1-day buffer; no date or a past date |
 | **Margin** | Below the 20% comfort line (45), below the 15% minimum (85), or negative (100) |
-| **Data completeness** | Each missing required field adds 32; low extraction confidence adds the gap below 70% |
+| **Data completeness** | Each missing required field adds 32; low extraction confidence adds the gap below the configured minimum (80% by default) |
 | **Order anomaly** | Base 5, plus high value (+35), unknown customer (+25), possible duplicate within 3 days (+30), no service deposit (+70), capacity exceeded (+50) |
 
-Bands: **Low 0–24**, **Medium 25–49**, **High 50–74**, **Critical 75–100**.
+Default bands: **Low 0–24**, **Medium 25–49**, **High 50–74**, **Critical 75–100**.
+The Settings screen lets the owner adjust all three band cutoffs (subject to
+`Medium < High < Critical`), plus margin, confidence, order-value and lead-time
+thresholds. Industry-factor weights are editable too and must total 100%; they
+are stored separately per industry. Each analysis returns the effective score cutoffs and the layer
+that controlled routing (`information_missing`, `hard_block`,
+`weighted_review` or `low_risk_precheck`).
 
 Two design choices keep the badge honest:
 
-1. **Hard blockers floor the band.** A `REJECT` or `NEEDS_REVIEW` is at least
-   High (50), and `REQUEST_INFO` is at least Medium (25). A low-margin reject can
-   never display as "Low risk" just because most factors looked healthy. The
+1. **Hard blockers floor the band.** A hard `REJECT` or information-confidence
+   blocker is at least High (the configured High cutoff), and `REQUEST_INFO`
+   is at least Medium (the configured Medium cutoff). A weighted Medium review
+   stays Medium and requires a written mitigation note, not a high-risk special
+   approval. A low-margin reject can never display as "Low risk" just because
+   most factors looked healthy. The
    API returns both `riskScore` and `rawRiskScore` so the UI can show that a
    floor was applied.
 2. **The score never approves anything.** The recommendation comes from the
    explicit rules; the score only prioritises review and explains exposure.
+
+The returned response plan is also deterministic: delivery shortfalls include
+an earliest feasible date and negotiation text; service bookings without a
+deposit recommend prepayment/third-party guarantee; compliance flags produce a
+refusal draft; and high-risk orders route to documented owner review. The
+Activity view exposes weekly/monthly risk reviews. Extraction accuracy is
+reported only for messages explicitly marked accurate/inaccurate by a reviewer,
+so an unreviewed extraction is never counted as correct.
+
+Each activity event stores evidence and a SHA-256 link to the preceding event.
+`GET /api/audit/verify` detects changes to a chained event; this is
+tamper-evident logging, not a WORM store or protection against a privileged
+operator rewriting the entire file and recomputing the chain. Production
+deployment needs append-only external storage for stronger immutability.
 
 Industry weights:
 
@@ -538,7 +636,7 @@ source .venv/bin/activate
 pytest -q
 ```
 
-Expected: **15 passed**. The suite covers:
+Expected: **16 passed**. The suite covers:
 
 - health and catalog;
 - the full Aisyah flow, including two purchase drafts and the activity log;
@@ -554,6 +652,8 @@ Expected: **15 passed**. The suite covers:
 - owner override requires a reason;
 - Excel export row count and formula-injection protection;
 - demo reset clears orders and restores 34 messages;
+- the six channel connectors, reconnect state, demo sync, webhook ingestion,
+  duplicate-id protection and disconnected-channel rejection;
 - all six industry profiles expose five risk weights that sum to 1;
 - switching to wholesale changes the catalog, order fields and intake result
   (10 messages → 6 orders), and hard blockers keep their risk floor;
@@ -580,6 +680,10 @@ bun run build
   purchase draft is recorded with actor, role and timestamp.
 - **API keys** live in environment variables / Replit Secrets, never in Git.
   `.env` is ignored.
+- **Channel credentials** must be stored server-side in environment variables or
+  a secret manager. The browser only receives safe connection metadata. Set
+  `SMARTORDERHUB_CHANNEL_WEBHOOK_TOKEN` to require the `X-Webhook-Token` header;
+  production adapters must also verify each platform's signature.
 - **If an AI API is enabled**, the message text is sent to the model provider.
   For a real deployment, mask phone numbers and addresses, set a retention
   period, obtain consent, and document the provider under Malaysia's PDPA
@@ -641,9 +745,15 @@ proposed two-service contract.
 - Authentication and roles are simulated with a role selector. A production
   build would use Orbyte identity / SSO and real RBAC.
 - The JSON store is single-process. A production build would use a database.
-- WhatsApp and email are paste/import only; no live connectors.
+- The six channel connectors are **simulated demo adapters**. They do not call
+  live platform APIs, perform OAuth or verify platform signatures. The webhook
+  route is real but expects normalised JSON. See
+  [`docs/CHANNEL-INTEGRATION.md`](docs/CHANNEL-INTEGRATION.md).
+- `autoSync` is a stored preference; no background scheduler polls channels.
 - The AI path is optional and depends on a provider; the rule path is the
   reliability fallback. Bulk intake is rule-based by default.
+- The UI is trilingual, but incoming messages and backend-generated
+  analysis/audit text are stored and displayed in their original language.
 - The order table scrolls horizontally on narrow screens, but the **Confirm**
   column is pinned to the right so the one-click action stays visible.
 - Purchase drafts stop at `draft`; no supplier is contacted.

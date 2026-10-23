@@ -1,20 +1,47 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# SmartOrder Hub — frontend
 
-# Run and deploy your AI Studio app
+React 19 + TypeScript + Vite + Tailwind CSS 4. The frontend talks to the FastAPI
+backend through the `/api` proxy configured in `vite.config.ts`.
 
-This contains everything you need to run your app locally.
+## Scripts
 
-View your app in AI Studio: https://ai.studio/apps/6628403e-daa2-4eb2-a0c8-b870bcabfe54
+```bash
+bun install
+bun run dev      # http://localhost:3000
+bun run lint     # tsc --noEmit
+bun run build    # production bundle in dist/
+```
 
-## Run Locally
+Start the backend on port 8000 first. The Vite dev server proxies `/api` to it.
+In production FastAPI serves `dist/` itself.
 
-**Prerequisites:**  Node.js
+## Main screens
 
+- **Order Desk** — AI/rules intake, clean order table and risk mix.
+- **Inbox** — raw messages from every connected channel.
+- **Channel Hub** — WhatsApp, Facebook Messenger, Instagram, Telegram, email and
+  TikTok connectors with connection state, sync actions and webhook paths.
+- **Orders & purchases** — approved records, purchase drafts and exports.
+- **Activity log**, **Catalog & stock**, **Settings**.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## Languages
+
+The UI is translated into English, Simplified Chinese and Bahasa Melayu:
+
+- `src/i18n/translations.ts` — shared base keys;
+- `src/i18n/v2Translations.ts` — v2 screen keys and overrides;
+- `src/i18n/I18nContext.tsx` — provider, fallback order and persistence;
+- `src/components/LanguageSwitcher.tsx` — top-bar selector.
+
+Static UI text is translated. Imported customer messages and backend-generated
+analysis/audit text remain in the language in which they were recorded.
+
+## Channel collection
+
+`src/components/ChannelHubView.tsx` and `src/services/channelsApi.ts` implement
+the Channel Hub. The backend connectors are deterministic demo adapters; see
+[`../docs/CHANNEL-INTEGRATION.md`](../docs/CHANNEL-INTEGRATION.md) for the real
+OAuth/webhook requirements.
+
+The project-wide architecture, API and demo script are documented in
+[`../README.md`](../README.md).

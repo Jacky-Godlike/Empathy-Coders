@@ -14,6 +14,7 @@ import {
   CatalogSupplier,
   fetchCatalog,
 } from '../services/workspaceApi';
+import { useI18n } from '../i18n/I18nContext';
 
 interface CatalogViewProps {
   industry: IndustryProfile;
@@ -27,6 +28,7 @@ const money = (value: number) =>
   }).format(value || 0);
 
 export const CatalogView: React.FC<CatalogViewProps> = ({ industry }) => {
+  const { t } = useI18n();
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [suppliers, setSuppliers] = useState<CatalogSupplier[]>([]);
   const [search, setSearch] = useState('');
@@ -41,11 +43,11 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ industry }) => {
       setProducts(data.products);
       setSuppliers(data.suppliers);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Could not load the catalog');
+      setError(err instanceof Error ? err.message : t('catalog.loadError'));
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     load();
@@ -81,12 +83,12 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ industry }) => {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-base font-bold text-slate-900 dark:text-white">
-            {industry.name} catalog
+            {t('catalog.title', { industry: industry.name })}
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            The reference data behind every stock, capacity and margin check.
+            {t('catalog.subtitle')}
             {industry.inventoryMode !== 'stock'
-              ? ` This industry uses ${industry.inventoryMode} rather than finished-goods stock.`
+              ? ` ${t('catalog.modeNote', { mode: industry.inventoryMode })}`
               : ''}
           </p>
         </div>
@@ -96,20 +98,20 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ industry }) => {
           className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-60"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-          Refresh
+          {t('common.refresh')}
         </button>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
         {[
           {
-            label: 'Products / services',
+            label: t('catalog.products'),
             value: products.length,
             Icon: Package,
           },
-          { label: 'Suppliers', value: suppliers.length, Icon: Truck },
-          { label: 'Below safety', value: belowSafety, Icon: AlertCircle },
-          { label: 'Stock value', value: money(stockValue), Icon: Boxes },
+          { label: t('catalog.suppliers'), value: suppliers.length, Icon: Truck },
+          { label: t('catalog.belowSafety'), value: belowSafety, Icon: AlertCircle },
+          { label: t('catalog.stockValue'), value: money(stockValue), Icon: Boxes },
         ].map(({ label, value, Icon }) => (
           <div
             key={label}
@@ -140,7 +142,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ industry }) => {
         <input
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search SKU, name or alias…"
+          placeholder={t('catalog.search')}
           className="w-full pl-8 pr-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400"
         />
       </div>
@@ -148,7 +150,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ industry }) => {
       {isLoading ? (
         <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-10 flex items-center justify-center gap-2 text-xs text-slate-400">
           <Loader2 className="w-4 h-4 animate-spin" />
-          Loading catalog…
+          {t('catalog.loading')}
         </div>
       ) : (
         <>
@@ -156,19 +158,25 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ industry }) => {
             <table className="w-full text-xs text-left min-w-[1050px]">
               <thead className="bg-slate-50 dark:bg-slate-800/70 text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700">
                 <tr>
-                  <th className="py-2.5 px-3">SKU</th>
-                  <th className="py-2.5 px-3">Name</th>
+                  <th className="py-2.5 px-3">{t('catalog.sku')}</th>
+                  <th className="py-2.5 px-3">{t('catalog.name')}</th>
                   <th className="py-2.5 px-3 text-right">
-                    {industry.labels.stock}
+                    {t(
+                      industry.inventoryMode === 'capacity'
+                        ? 'inventory.capacity'
+                        : industry.inventoryMode === 'material'
+                        ? 'inventory.material'
+                        : 'inventory.stock'
+                    )}
                   </th>
-                  <th className="py-2.5 px-3 text-right">Safety</th>
-                  <th className="py-2.5 px-3 text-right">Sell</th>
-                  <th className="py-2.5 px-3 text-right">Cost</th>
-                  <th className="py-2.5 px-3 text-right">Unit margin</th>
-                  <th className="py-2.5 px-3">Supplier</th>
-                  <th className="py-2.5 px-3 text-right">Lead</th>
+                  <th className="py-2.5 px-3 text-right">{t('catalog.safety')}</th>
+                  <th className="py-2.5 px-3 text-right">{t('catalog.sell')}</th>
+                  <th className="py-2.5 px-3 text-right">{t('catalog.cost')}</th>
+                  <th className="py-2.5 px-3 text-right">{t('catalog.unitMargin')}</th>
+                  <th className="py-2.5 px-3">{t('catalog.supplier')}</th>
+                  <th className="py-2.5 px-3 text-right">{t('catalog.lead')}</th>
                   {hasCapacity && (
-                    <th className="py-2.5 px-3 text-right">Capacity</th>
+                    <th className="py-2.5 px-3 text-right">{t('catalog.capacity')}</th>
                   )}
                 </tr>
               </thead>
@@ -240,16 +248,16 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ industry }) => {
             <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
               <Truck className="w-4 h-4 text-slate-500" />
               <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                Suppliers
+                {t('catalog.suppliers')}
               </h3>
             </div>
             <table className="w-full text-xs text-left min-w-[620px]">
               <thead className="bg-slate-50 dark:bg-slate-800/70 text-slate-600 dark:text-slate-300">
                 <tr>
-                  <th className="py-2 px-3">Supplier</th>
-                  <th className="py-2 px-3 text-right">Lead time</th>
-                  <th className="py-2 px-3 text-right">MOQ</th>
-                  <th className="py-2 px-3">Contact</th>
+                  <th className="py-2 px-3">{t('catalog.supplier')}</th>
+                  <th className="py-2 px-3 text-right">{t('catalog.leadTime')}</th>
+                  <th className="py-2 px-3 text-right">{t('catalog.moq')}</th>
+                  <th className="py-2 px-3">{t('catalog.contact')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -259,7 +267,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ industry }) => {
                       {supplier.name}
                     </td>
                     <td className="py-2 px-3 text-right">
-                      {supplier.leadTimeDays} day(s)
+                      {t('catalog.days', { count: supplier.leadTimeDays })}
                     </td>
                     <td className="py-2 px-3 text-right">{supplier.moq}</td>
                     <td className="py-2 px-3 text-slate-500">
