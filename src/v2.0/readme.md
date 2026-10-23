@@ -3,10 +3,13 @@
 **SDC Hackathon 2026 · Domain 2: Orbyte Smart SME Challenge**
 
 SmartOrder Hub is a smart order consolidation and approval workflow for Malaysian
-micro and small businesses. It takes orders from WhatsApp, email or manual entry,
-extracts the fields, checks stock, supplier lead time, revenue and margin, and
-routes the final decision to the owner. Every action is written to an activity
-log.
+micro and small businesses. It collects messages from WhatsApp, Facebook
+Messenger, Instagram, Telegram, email and TikTok, extracts the fields, checks
+stock, supplier lead time, revenue and margin, and routes the final decision to
+the owner. Every action is written to an activity log.
+
+The interface is available in **English, Simplified Chinese and Bahasa Melayu**;
+use the language selector in the top bar.
 
 The main screen is a **single order review table**: the intake engine classifies
 34 synthetic messages (orders, inquiries, ads, after-sales, noise), and only the
@@ -24,8 +27,11 @@ The top bar has an **identity switcher**: the Owner can confirm, reject or
 request information; Staff is view-only and can still inspect every order and
 its analysis. The interface uses a warm cream, terracotta and olive palette.
 
-The left navigation adds **Order Desk, Inbox, Orders & purchases, Activity log,
-Catalog & stock and Settings**. Settings includes an industry selector: F&B,
+The left navigation adds **Order Desk, Inbox, Channel Hub, Orders & purchases,
+Activity log, Catalog & stock and Settings**. **Channel Hub** shows six social
+and messaging connectors with connection state, sync actions, webhook paths and
+an explicit notice that the demo adapters use synthetic samples. Settings
+includes an industry selector: F&B,
 retail, wholesale, services, manufacturing and logistics each have their own
 order fields, inventory semantics, risk weights and synthetic dataset. Stock,
 profit and risk are always calculated by explicit rules; AI is only used to read
@@ -41,7 +47,12 @@ steps.
 
 The application lives in [`smartorder-hub/`](smartorder-hub/). See
 [`smartorder-hub/README.md`](smartorder-hub/README.md) for the architecture, API, data
-model, decision rules, demo script and run instructions.
+model, decision rules, demo script and run instructions. The production
+requirements for WhatsApp/Meta/Telegram/email/TikTok OAuth, webhook signatures
+and token storage are documented in
+[`smartorder-hub/docs/CHANNEL-INTEGRATION.md`](smartorder-hub/docs/CHANNEL-INTEGRATION.md).
+The connectors in this build are deterministic demo adapters, not live platform
+integrations.
 
 ## Quick start
 
@@ -51,6 +62,7 @@ cd smartorder-hub/backend
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+cp .env.example .env          # optional: edit thresholds / AI / webhook token
 uvicorn app.main:app --reload --port 8000
 
 # frontend (another terminal)

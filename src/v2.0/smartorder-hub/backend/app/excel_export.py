@@ -33,10 +33,19 @@ COLUMNS = [
     ("Order Margin", "margin"),
     ("Recommendation", "recommendation"),
     ("Approved By", "approved_by"),
+    ("Risk Triggers", "risk_triggers"),
+    ("Disposition", "disposition"),
+    ("Actual On Time", "actual_on_time"),
+    ("Actual Profit (RM)", "actual_profit"),
     ("Created At", "created_at"),
 ]
 
-CURRENCY_HEADERS = {"Unit Price (RM)", "Line Total (RM)", "Order Revenue (RM)"}
+CURRENCY_HEADERS = {
+    "Unit Price (RM)",
+    "Line Total (RM)",
+    "Order Revenue (RM)",
+    "Actual Profit (RM)",
+}
 
 
 def safe_cell(value: Any) -> Any:
@@ -85,11 +94,24 @@ def generate_order_excel(orders: list[dict]) -> bytes:
                     analysis.get("margin"),
                     safe_cell(analysis.get("recommendation")),
                     safe_cell(approval.get("actor")),
+                    safe_cell(
+                        "; ".join(
+                            trigger["detail"]
+                            for trigger in analysis.get("riskTriggers", [])
+                        )
+                    ),
+                    safe_cell(
+                        f"Owner override: {approval.get('specialReason')}; {approval.get('note')}"
+                        if approval.get("override")
+                        else approval.get("decision")
+                    ),
+                    (order.get("actualOutcome") or {}).get("actualDeliveredOnTime"),
+                    (order.get("actualOutcome") or {}).get("actualProfit"),
                     safe_cell(order.get("createdAt")),
                 ]
             )
 
-    widths = (20, 16, 24, 22, 16, 16, 26, 10, 16, 16, 18, 14, 22, 18, 24)
+    widths = (20, 16, 24, 22, 16, 16, 26, 10, 16, 16, 18, 14, 22, 18, 45, 32, 16, 18, 24)
     for index, width in enumerate(widths, start=1):
         sheet.column_dimensions[get_column_letter(index)].width = width
 

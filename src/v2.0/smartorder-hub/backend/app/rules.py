@@ -7,12 +7,27 @@ configured policy, so a judge can recompute it by hand.
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from . import config
 from .extraction import match_product
 from .industries import get_industry
 from .risk import assess_risk
+
+SENSITIVE_TERMS = (
+    "explosive",
+    "firearm",
+    "weapon",
+    "illegal drugs",
+    "counterfeit goods",
+    "bahan letupan",
+    "senjata api",
+    "dadah haram",
+    "违禁品",
+    "爆炸物",
+    "枪支",
+    "非法毒品",
+)
 
 
 def _find_supplier(suppliers: list[dict], supplier_id: str | None) -> dict | None:
@@ -32,8 +47,12 @@ def analyze_order(
     high_value_threshold: float | None = None,
     lead_buffer_days: int | None = None,
     min_confidence: float | None = None,
+    risk_medium_threshold: float | None = None,
+    risk_high_threshold: float | None = None,
+    risk_critical_threshold: float | None = None,
     industry: dict | None = None,
     history: list[dict] | None = None,
+    source_text: str = "",
 ) -> dict:
     industry = industry or get_industry(order.get("industry"))
     min_margin = config.MIN_MARGIN if min_margin is None else min_margin
@@ -42,6 +61,21 @@ def analyze_order(
         config.HIGH_VALUE_THRESHOLD
         if high_value_threshold is None
         else high_value_threshold
+    )
+    risk_medium_threshold = (
+        config.RISK_MEDIUM_THRESHOLD
+        if risk_medium_threshold is None
+        else risk_medium_threshold
+    )
+    risk_high_threshold = (
+        config.RISK_HIGH_THRESHOLD
+        if risk_high_threshold is None
+        else risk_high_threshold
+    )
+    risk_critical_threshold = (
+        config.RISK_CRITICAL_THRESHOLD
+        if risk_critical_threshold is None
+        else risk_critical_threshold
     )
     lead_buffer_days = (
         config.LEAD_TIME_BUFFER_DAYS
@@ -281,18 +315,38 @@ def analyze_order(
         min_margin=min_margin,
         warn_margin=warn_margin,
         high_value_threshold=high_value_threshold,
+        min_confidence=min_confidence,
+        risk_medium_threshold=risk_medium_threshold,
+        risk_high_threshold=risk_high_threshold,
+        risk_critical_threshold=risk_critical_threshold,
     )
+    matched_terms = [
+        term
+        for term in SENSITIVE_TERMS
+        if term.casefold() in source_text.casefold()
+    ]
+    compliance_blocked = bool(matched_terms)
+    if compliance_blocked:
+        checks.append(
+            _check(
+                "compliance:sensitive_term",
+                "fail",
+                "Potentially prohibited goods or services detected; owner review is mandatory.",
+            )
+        )
     if missing_fields:
         recommendation = "REQUEST_INFO"
     elif unmatched:
         recommendation = "NEEDS_REVIEW"
     elif confidence < min_confidence:
         recommendation = "NEEDS_REVIEW"
+    elif compliance_blocked:
+        recommendation = "REJECT"
     elif stock_blocked or risk["capacityBlocked"]:
         recommendation = "REJECT"
     elif margin < min_margin:
         recommendation = "REJECT"
-    elif risk["band"] in ("High", "Critical"):
+    elif risk["band"] in ("Medium", "High", "Critical"):
         recommendation = "NEEDS_REVIEW"
     elif needs_purchase:
         recommendation = "ACCEPT_WITH_PURCHASE"
@@ -302,15 +356,18 @@ def analyze_order(
     # A hard blocker must not be presented as "Low risk" in the table.
     raw_risk_score = risk["score"]
     floor_applied = False
-    if recommendation in ("REJECT", "NEEDS_REVIEW") and risk["band"] in (
-        "Low",
-        "Medium",
-    ):
-        risk["score"] = max(risk["score"], 50.0)
+    hard_blocker = (
+        recommendation == "REJECT"
+        or unmatched
+        or confidence < min_confidence
+        or compliance_blocked
+    )
+    if hard_blocker and risk["band"] in ("Low", "Medium"):
+        risk["score"] = max(risk["score"], risk_high_threshold)
         risk["band"] = "High"
         floor_applied = True
     elif recommendation == "REQUEST_INFO" and risk["band"] == "Low":
-        risk["score"] = max(risk["score"], 25.0)
+        risk["score"] = max(risk["score"], risk_medium_threshold)
         risk["band"] = "Medium"
         floor_applied = True
 
@@ -343,6 +400,105 @@ def analyze_order(
     if not reasons:
         reasons = ["All checks passed; the order is ready for human approval."]
 
+    short_lines = [line for line in stock_checks if line["shortfall"] > 0]
+    earliest_delivery = None
+    if short_lines:
+        earliest_delivery = (
+            date.today()
+            + timedelta(
+                days=max(line["leadTimeDays"] for line in short_lines)
+                + lead_buffer_days
+            )
+        ).isoformat()
+
+    response_actions = []
+    if compliance_blocked:
+        response_actions.append(
+            {
+                "strategy": "avoid",
+                "action": "Do not accept this request; send a refusal for owner review.",
+                "suggestedReply": "Thank you for your enquiry. We are unable to fulfil this request.",
+            }
+        )
+    if missing_fields or confidence < min_confidence:
+        response_actions.append(
+            {
+                "strategy": "mitigate",
+                "action": "Return the order for customer-service clarification before approval.",
+                "suggestedReply": (
+                    "Please confirm: "
+                    + (", ".join(missing_fields) or "the uncertain order details")
+                    + "."
+                ),
+            }
+        )
+    if short_lines and earliest_delivery:
+        response_actions.append(
+            {
+                "strategy": "mitigate",
+                "action": f"Negotiate delivery no earlier than {earliest_delivery}.",
+                "earliestCommitDate": earliest_delivery,
+                "suggestedReply": (
+                    f"We can currently commit to delivery on or after {earliest_delivery}. "
+                    "Would that work for you?"
+                ),
+            }
+        )
+    if risk["noDeposit"]:
+        response_actions.append(
+            {
+                "strategy": "transfer",
+                "action": "Request full prepayment or use a third-party guaranteed transaction.",
+            }
+        )
+    if risk["band"] == "Medium" and recommendation == "NEEDS_REVIEW":
+        response_actions.append(
+            {
+                "strategy": "mitigate",
+                "action": "Review the highlighted non-fatal factors and adjust the order terms before approval.",
+            }
+        )
+    if recommendation == "REJECT" or risk["band"] in ("High", "Critical"):
+        response_actions.append(
+            {
+                "strategy": "escalate",
+                "action": "Route to the owner for a documented decision; do not auto-approve.",
+            }
+        )
+    if recommendation in ("ACCEPT", "ACCEPT_WITH_PURCHASE"):
+        response_actions.append(
+            {"strategy": "accept", "action": "Record the exposure and proceed with owner confirmation."}
+        )
+
+    risk_triggers = [
+        {
+            "code": check["code"],
+            "category": (
+                "compliance"
+                if check["code"].startswith("compliance")
+                else "information"
+                if check["code"] in ("missing_fields", "confidence")
+                else "profit"
+                if check["code"] == "margin"
+                else "inventory"
+                if check["code"].startswith("stock:")
+                else "delivery"
+                if "lead time" in check["message"].lower()
+                else "credit"
+                if "deposit" in check["message"].lower()
+                else "customer"
+                if "customer" in check["message"].lower()
+                else "duplicate"
+                if "duplicate" in check["message"].lower()
+                else "operations"
+            ),
+            "detail": check["message"],
+        }
+        for check in checks
+        if check["level"] in ("warn", "fail")
+        and check["code"] not in ("risk", "risk_floor")
+    ]
+
     return {
         "recommendation": recommendation,
         "reasons": reasons,
@@ -355,7 +511,26 @@ def analyze_order(
         "riskScore": risk["score"],
         "rawRiskScore": raw_risk_score,
         "riskBand": risk["band"],
+        "scoreThresholds": {
+            "medium": risk_medium_threshold,
+            "high": risk_high_threshold,
+            "critical": risk_critical_threshold,
+        },
         "riskFactors": risk["factors"],
+        "riskTriggers": risk_triggers,
+        "responseActions": response_actions,
+        "complianceBlocked": compliance_blocked,
+        "informationMissing": bool(missing_fields) or confidence < min_confidence,
+        "assessmentLayer": (
+            "information_missing"
+            if missing_fields or confidence < min_confidence
+            else "hard_block"
+            if compliance_blocked or recommendation == "REJECT"
+            else "weighted_review"
+            if risk["band"] in ("Medium", "High", "Critical")
+            else "low_risk_precheck"
+        ),
+        "matchedSensitiveTerms": matched_terms,
         "daysUntilDelivery": days_until,
         "missingFields": missing_fields,
         "confidence": confidence,

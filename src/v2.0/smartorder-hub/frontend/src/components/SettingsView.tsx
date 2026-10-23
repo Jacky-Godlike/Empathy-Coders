@@ -28,7 +28,9 @@ import {
   fetchAiStatus,
   switchIndustry,
   testAiConnection,
+  updateRiskPolicy,
 } from '../services/workspaceApi';
+import { useI18n } from '../i18n/I18nContext';
 
 interface SettingsViewProps {
   workspace: Workspace;
@@ -71,6 +73,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onReset,
   onNavigate,
 }) => {
+  const { t } = useI18n();
   const [selected, setSelected] = useState(workspace.industry.id);
   const [isApplying, setIsApplying] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
@@ -81,11 +84,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [aiTestError, setAiTestError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [isSavingPolicy, setIsSavingPolicy] = useState(false);
+  const [policyDraft, setPolicyDraft] = useState(workspace.rules);
+  const [weightDraft, setWeightDraft] = useState(
+    workspace.industry.riskWeights
+  );
 
   useEffect(() => {
     setSelected(workspace.industry.id);
     setAi(workspace.ai);
-  }, [workspace.industry.id, workspace.ai]);
+    setPolicyDraft(workspace.rules);
+    setWeightDraft(workspace.industry.riskWeights);
+  }, [
+    workspace.industry.id,
+    workspace.industry.riskWeights,
+    workspace.ai,
+    workspace.rules,
+  ]);
 
   const selectedProfile: IndustryProfile | undefined = useMemo(
     () => workspace.industries.find((profile) => profile.id === selected),
@@ -96,9 +111,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     if (selected === workspace.industry.id) return;
     const profile = workspace.industries.find((item) => item.id === selected);
     const confirmed = window.confirm(
-      `Switch the demo workspace to ${profile?.name ?? selected}?\n\n` +
-        'This reloads the synthetic catalog, suppliers and inbox for that ' +
-        'industry. Current demo orders and activity will be reset.'
+      t('settings.switchConfirm', { name: profile?.name ?? selected })
     );
     if (!confirmed) return;
 
@@ -109,13 +122,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       const result = await switchIndustry(selected);
       onWorkspaceChanged(result.workspace);
       setNotice(
-        `Workspace switched to ${result.workspace.industry.name}. A fresh synthetic inbox is ready.`
+        t('settings.switchSuccess', { name: result.workspace.industry.name })
       );
       onNavigate('desk');
     } catch (err: unknown) {
-      setError(
-        err instanceof Error ? err.message : 'Could not switch the industry'
-      );
+      setError(err instanceof Error ? err.message : t('settings.switchError'));
     } finally {
       setIsApplying(false);
     }
@@ -129,15 +140,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       setAi(status);
       setNotice(
         status.configured
-          ? `AI extraction is available via ${
-              status.providerLabel || status.provider
-            } · ${status.model}.`
-          : 'No AI key detected. Rules fallback is active and fully functional.'
+          ? t('settings.aiAvailable', {
+              provider: status.providerLabel || status.provider,
+              model: status.model,
+            })
+          : t('settings.aiMissing')
       );
     } catch (err: unknown) {
-      setError(
-        err instanceof Error ? err.message : 'Could not read the AI status'
-      );
+      setError(err instanceof Error ? err.message : t('settings.aiReadError'));
     } finally {
       setIsRefreshingAi(false);
     }
@@ -154,35 +164,135 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       setAi(await fetchAiStatus());
       setNotice(result.message);
     } catch (err: unknown) {
-      setAiTestError(
-        err instanceof Error ? err.message : 'The AI connection test failed'
-      );
+      setAiTestError(err instanceof Error ? err.message : t('settings.aiTestError'));
     } finally {
       setIsTestingAi(false);
     }
   };
 
   const handleReset = async () => {
-    const confirmed = window.confirm(
-      'Reset all demo data for the current industry?\n\n' +
-        'Orders, approvals, purchase drafts and activity will return to the synthetic seed.'
-    );
+    const confirmed = window.confirm(t('settings.resetConfirm'));
     if (!confirmed) return;
     setIsResetting(true);
     setError(null);
     setNotice(null);
     try {
       await onReset();
-      setNotice('Demo data reset to the synthetic seed.');
+      setNotice(t('settings.resetSuccess'));
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Reset failed');
+      setError(err instanceof Error ? err.message : t('settings.resetError'));
     } finally {
       setIsResetting(false);
     }
   };
 
-  const weightEntries = Object.entries(workspace.industry.riskWeights);
-  const rules = workspace.rules;
+  const handleSavePolicy = async () => {
+    setIsSavingPolicy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const updated = await updateRiskPolicy(policyDraft, weightDraft);
+      onWorkspaceChanged(updated);
+      setPolicyDraft(updated.rules);
+      setWeightDraft(updated.industry.riskWeights);
+      setNotice(t('settings.policySaved'));
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : t('settings.policySaveError'));
+    } finally {
+      setIsSavingPolicy(false);
+    }
+  };
+
+  const setPolicyValue = (
+    key: keyof Workspace['rules'],
+    entered: number
+  ) => {
+    const value =
+      key === 'minMargin' || key === 'warnMargin' || key === 'minConfidence'
+        ? entered / 100
+        : entered;
+    setPolicyDraft((current) => {
+      switch (key) {
+        case 'minMargin':
+          return { ...current, minMargin: value };
+        case 'warnMargin':
+          return { ...current, warnMargin: value };
+        case 'highValueThreshold':
+          return { ...current, highValueThreshold: value };
+        case 'leadTimeBufferDays':
+          return { ...current, leadTimeBufferDays: value };
+        case 'minConfidence':
+          return { ...current, minConfidence: value };
+        case 'riskMediumThreshold':
+          return { ...current, riskMediumThreshold: value };
+        case 'riskHighThreshold':
+          return { ...current, riskHighThreshold: value };
+        case 'riskCriticalThreshold':
+          return { ...current, riskCriticalThreshold: value };
+      }
+    });
+  };
+
+  const weightEntries = Object.entries(weightDraft);
+  const weightTotal = Object.values(weightDraft).reduce(
+    (total, weight) => total + weight,
+    0
+  );
+  const policyFields: Array<{
+    key: keyof Workspace['rules'];
+    label: string;
+    value: string;
+    hint: string;
+  }> = [
+    {
+      key: 'minMargin',
+      label: t('settings.minMargin'),
+      value: `${(policyDraft.minMargin * 100).toFixed(0)}`,
+      hint: t('settings.minMarginHint'),
+    },
+    {
+      key: 'warnMargin',
+      label: t('settings.warnMargin'),
+      value: `${(policyDraft.warnMargin * 100).toFixed(0)}`,
+      hint: t('settings.warnMarginHint'),
+    },
+    {
+      key: 'highValueThreshold',
+      label: t('settings.highValueReview'),
+      value: `${policyDraft.highValueThreshold}`,
+      hint: t('settings.highValueHint'),
+    },
+    {
+      key: 'leadTimeBufferDays',
+      label: t('settings.leadTimeBuffer'),
+      value: `${policyDraft.leadTimeBufferDays}`,
+      hint: t('settings.leadTimeHint'),
+    },
+    {
+      key: 'minConfidence',
+      label: t('settings.minConfidence'),
+      value: `${(policyDraft.minConfidence * 100).toFixed(0)}`,
+      hint: t('settings.minConfidenceHint'),
+    },
+    {
+      key: 'riskMediumThreshold',
+      label: t('settings.riskMediumThreshold'),
+      value: `${policyDraft.riskMediumThreshold}`,
+      hint: t('settings.riskBandHint'),
+    },
+    {
+      key: 'riskHighThreshold',
+      label: t('settings.riskHighThreshold'),
+      value: `${policyDraft.riskHighThreshold}`,
+      hint: t('settings.riskBandHint'),
+    },
+    {
+      key: 'riskCriticalThreshold',
+      label: t('settings.riskCriticalThreshold'),
+      value: `${policyDraft.riskCriticalThreshold}`,
+      hint: t('settings.riskBandHint'),
+    },
+  ];
 
   return (
     <div className="space-y-5">
@@ -207,17 +317,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <div className="flex items-center gap-2">
               <SlidersHorizontal className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
               <h2 className="text-sm font-bold text-slate-900 dark:text-white">
-                Business industry
+                {t('settings.industryTitle')}
               </h2>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-2xl">
-              The industry changes the order fields the extractor looks for,
-              the catalog semantics, and the weights used by the risk score.
-              Each profile ships with its own synthetic dataset.
+              {t('settings.industryBody')}
             </p>
           </div>
           <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-            Current: {workspace.industry.name}
+            {t('settings.current', { name: workspace.industry.name })}
           </span>
         </div>
 
@@ -251,7 +359,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       </p>
                       {active && (
                         <span className="text-[9px] font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded">
-                          Current
+                          {t('settings.currentBadge')}
                         </span>
                       )}
                     </div>
@@ -265,10 +373,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     {profile.inventoryMode}
                   </span>
                   <span className="text-[9px] font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 rounded px-1.5 py-0.5">
-                    {profile.fields.length} fields
+                    {t('settings.fieldsCount', { count: profile.fields.length })}
                   </span>
                   <span className="text-[9px] font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 rounded px-1.5 py-0.5">
-                    {profile.requiredFields.length} required
+                    {t('settings.requiredCount', {
+                      count: profile.requiredFields.length,
+                    })}
                   </span>
                 </div>
                 {picked && (
@@ -284,7 +394,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         {selectedProfile && (
           <div className="mt-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 p-3">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-              Order fields for {selectedProfile.name}
+              {t('settings.orderFields', { name: selectedProfile.name })}
             </p>
             <div className="flex flex-wrap gap-1.5 mt-2">
               {selectedProfile.fields.map((field) => (
@@ -302,8 +412,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               ))}
             </div>
             <p className="text-[10px] text-slate-400 mt-2">
-              * required — a missing required field routes the order to Request
-              info instead of accepting it.
+              {t('settings.requiredNote')}
             </p>
           </div>
         )}
@@ -311,7 +420,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         <div className="flex flex-wrap items-center justify-between gap-2 mt-3">
           <p className="text-[10px] text-slate-400 flex items-center gap-1">
             <Info className="w-3 h-3" />
-            Switching reloads synthetic data. No real customer data is involved.
+            {t('settings.switchNote')}
           </p>
           <button
             onClick={handleApplyIndustry}
@@ -324,8 +433,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <ArrowRight className="w-3.5 h-3.5" />
             )}
             {selected === workspace.industry.id
-              ? 'Current industry'
-              : `Use ${selectedProfile?.name ?? 'selected industry'}`}
+              ? t('settings.currentIndustry')
+              : t('settings.useIndustry', {
+                  name: selectedProfile?.name ?? t('settings.selectedIndustry'),
+                })}
           </button>
         </div>
       </section>
@@ -338,13 +449,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <div className="flex items-center gap-2">
                 <PlugZap className="w-4 h-4 text-violet-600 dark:text-violet-400" />
                 <h2 className="text-sm font-bold text-slate-900 dark:text-white">
-                  Connect AI API
+                  {t('settings.aiTitle')}
                 </h2>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                AI is used only to classify a message and extract structured
-                fields. Stock, profit, delivery and risk are always calculated
-                by explicit rules — never by the model.
+                {t('settings.aiBody')}
               </p>
             </div>
             <span
@@ -359,19 +468,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   ai.configured ? 'bg-emerald-500' : 'bg-amber-500'
                 }`}
               />
-              {ai.configured ? 'Key detected' : 'Rules fallback'}
+              {ai.configured ? t('settings.aiConfigured') : t('settings.aiFallback')}
             </span>
           </div>
 
           <dl className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
             {[
-              ['Provider', ai.providerLabel || ai.provider],
-              ['Model', ai.model],
+              [t('settings.aiProvider'), ai.providerLabel || ai.provider],
+              [t('settings.aiModel'), ai.model],
               [
-                'Key variable',
+                t('settings.aiKeyVariable'),
                 ai.keyEnv || (ai.provider === 'openai' ? 'AI_API_KEY' : 'GEMINI_API_KEY'),
               ],
-              ['Intake mode', ai.intakeMode],
+              [t('settings.aiIntake'), ai.intakeMode],
             ].map(([label, value]) => (
               <div
                 key={label}
@@ -390,16 +499,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           {!ai.configured && (
             <div className="mt-3 rounded-lg border border-amber-200 dark:border-amber-900 bg-amber-50/70 dark:bg-amber-950/20 p-3">
               <p className="text-[10px] font-bold text-amber-800 dark:text-amber-200">
-                Add a key on Replit
+                {t('settings.addKeyTitle')}
               </p>
               <ol className="mt-1 space-y-1 text-[10px] text-amber-800/90 dark:text-amber-300/90 list-decimal list-inside leading-relaxed">
-                <li>Open your Replit project → <strong>Tools → Secrets</strong>.</li>
+                <li>{t('settings.replitStep1')}</li>
                 <li>
-                  Add <code className="font-mono">{ai.keyEnv || 'GEMINI_API_KEY'}</code>{' '}
-                  with your API key.
+                  {t('settings.replitStep2', {
+                    key: ai.keyEnv || 'GEMINI_API_KEY',
+                  })}
                 </li>
-                <li>Restart the Run button (or republish) so the env var loads.</li>
-                <li>Return here and click <strong>Test connection</strong>.</li>
+                <li>{t('settings.replitStep3')}</li>
+                <li>{t('settings.replitStep4')}</li>
               </ol>
               <a
                 href="https://docs.replit.com/core-concepts/project-editor/app-setup/secrets"
@@ -407,7 +517,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 rel="noreferrer"
                 className="mt-2 inline-flex items-center gap-1 text-[10px] font-semibold text-amber-800 dark:text-amber-200 underline"
               >
-                Replit Secrets guide
+                {t('settings.replitGuide')}
                 <ExternalLink className="w-2.5 h-2.5" />
               </a>
             </div>
@@ -444,7 +554,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               ) : (
                 <PlugZap className="w-3.5 h-3.5" />
               )}
-              Test connection
+              {t('settings.aiTest')}
             </button>
             <button
               onClick={handleRefreshAi}
@@ -454,7 +564,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <RefreshCw
                 className={`w-3.5 h-3.5 ${isRefreshingAi ? 'animate-spin' : ''}`}
               />
-              Refresh status
+              {t('settings.aiRefresh')}
             </button>
           </div>
 
@@ -462,7 +572,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <div className="flex items-center gap-1.5">
               <Terminal className="w-3.5 h-3.5 text-slate-500" />
               <p className="text-[10px] font-semibold text-slate-600 dark:text-slate-300">
-                Where the code talks to AI
+                {t('settings.aiWhereTitle')}
               </p>
             </div>
             <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
@@ -491,7 +601,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
             <details className="mt-2">
               <summary className="cursor-pointer text-[10px] font-semibold text-slate-600 dark:text-slate-300">
-                Using another provider (OpenAI-compatible)
+                {t('settings.aiOtherProvider')}
               </summary>
               <div className="mt-1.5 space-y-1 font-mono text-[10px]">
                 <p className="rounded bg-slate-900 text-violet-300 px-2 py-1">
@@ -510,9 +620,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </details>
             <p className="text-[10px] text-slate-400 mt-2 flex items-start gap-1">
               <Sparkles className="w-3 h-3 mt-0.5 shrink-0" />
-              Keys are read on the server only. Never paste a key into the
-              browser or commit <code>.env</code>; use Replit Secrets for the
-              deployment.
+              {t('settings.aiSecurity')}
             </p>
           </div>
         </section>
@@ -522,42 +630,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
             <h2 className="text-sm font-bold text-slate-900 dark:text-white">
-              Decision rules
+              {t('settings.rulesTitle')}
             </h2>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Transparent thresholds behind every recommendation. These are
-            business policy, not model output.
+            {t('settings.rulesBody')}
           </p>
 
           <div className="mt-3 divide-y divide-slate-100 dark:divide-slate-800 rounded-lg border border-slate-200 dark:border-slate-800">
-            {[
-              {
-                label: 'Minimum margin',
-                value: `${(rules.minMargin * 100).toFixed(0)}%`,
-                hint: 'Below this, the order is rejected',
-              },
-              {
-                label: 'Margin warning',
-                value: `${(rules.warnMargin * 100).toFixed(0)}%`,
-                hint: 'Below this, the margin check warns',
-              },
-              {
-                label: 'High-value review',
-                value: `RM ${rules.highValueThreshold.toLocaleString()}`,
-                hint: 'Larger orders raise the risk score',
-              },
-              {
-                label: 'Lead-time buffer',
-                value: `${rules.leadTimeBufferDays} day(s)`,
-                hint: 'Added to supplier lead time',
-              },
-              {
-                label: 'Minimum confidence',
-                value: `${(rules.minConfidence * 100).toFixed(0)}%`,
-                hint: 'Lower extraction confidence needs review',
-              },
-            ].map((rule) => (
+            {policyFields.map((rule) => (
               <div
                 key={rule.label}
                 className="flex items-center justify-between gap-3 px-3 py-2"
@@ -568,17 +649,46 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   </p>
                   <p className="text-[9px] text-slate-400">{rule.hint}</p>
                 </div>
-                <span className="text-[11px] font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap">
-                  {rule.value}
-                </span>
+                <label className="flex items-center gap-1 text-[11px] font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap">
+                  {rule.key === 'highValueThreshold' ? 'RM' : ''}
+                  <input
+                    type="number"
+                    min={0}
+                    step={rule.key.includes('Margin') || rule.key === 'minConfidence' ? 1 : rule.key === 'leadTimeBufferDays' ? 1 : 10}
+                    value={rule.value}
+                    onChange={(event) =>
+                      setPolicyValue(rule.key, Number(event.target.value))
+                    }
+                    className="w-20 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-right"
+                    aria-label={rule.label}
+                  />
+                  {rule.key === 'minMargin' ||
+                  rule.key === 'warnMargin' ||
+                  rule.key === 'minConfidence'
+                    ? '%'
+                    : rule.key === 'leadTimeBufferDays'
+                    ? t('settings.daysUnit')
+                    : rule.key.startsWith('risk')
+                    ? '/100'
+                    : ''}
+                </label>
               </div>
             ))}
           </div>
+          <button
+            type="button"
+            onClick={handleSavePolicy}
+            disabled={isSavingPolicy || Math.abs(weightTotal - 1) >= 0.001}
+            className="mt-3 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold disabled:opacity-60"
+          >
+            {isSavingPolicy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            {t('settings.savePolicy')}
+          </button>
 
           <div className="mt-4 flex items-center gap-2">
             <ShieldCheck className="w-3.5 h-3.5 text-slate-500" />
             <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-              Risk weights · {workspace.industry.name}
+              {t('settings.riskWeights')} · {workspace.industry.name}
             </p>
           </div>
           <div className="mt-2 space-y-2">
@@ -586,25 +696,49 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <div key={key}>
                 <div className="flex items-center justify-between text-[10px]">
                   <span className="text-slate-600 dark:text-slate-300">
-                    {RISK_LABELS[key] || key}
+                    {t(`settings.risk.${key}`)}
                   </span>
-                  <span className="font-semibold text-slate-500">
-                    {(weight * 100).toFixed(0)}%
-                  </span>
+                  <label className="flex items-center gap-1 font-semibold text-slate-500">
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={1}
+                      value={(weight * 100).toFixed(0)}
+                      onChange={(event) =>
+                        setWeightDraft((current) => ({
+                          ...current,
+                          [key]: Number(event.target.value) / 100,
+                        }))
+                      }
+                      className="w-16 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-1.5 py-1 text-right"
+                      aria-label={t(`settings.risk.${key}`)}
+                    />
+                    %
+                  </label>
                 </div>
                 <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 mt-1 overflow-hidden">
                   <div
                     className={`h-full rounded-full ${RISK_COLORS[key] || 'bg-slate-400'}`}
-                    style={{ width: `${Math.round(weight * 100)}%` }}
+                    style={{ width: `${Math.max(0, Math.min(100, Math.round(weight * 100)))}%` }}
                   />
                 </div>
               </div>
             ))}
           </div>
+          <p
+            className={`text-[10px] mt-2 ${
+              Math.abs(weightTotal - 1) < 0.001
+                ? 'text-slate-400'
+                : 'text-rose-600 dark:text-rose-400'
+            }`}
+          >
+            {t('settings.weightTotal', {
+              total: (weightTotal * 100).toFixed(0),
+            })}
+          </p>
           <p className="text-[10px] text-slate-400 mt-2 leading-relaxed">
-            Score = Σ (factor score × weight), 0–100. Bands: Low 0–24, Medium
-            25–49, High 50–74, Critical 75–100. Hard blockers floor the band so
-            a reject or review can never display as low risk.
+            {t('settings.scoreFormula')}
           </p>
         </section>
       </div>
@@ -614,24 +748,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         <div className="flex items-center gap-2">
           <Users className="w-4 h-4 text-slate-600 dark:text-slate-400" />
           <h2 className="text-sm font-bold text-slate-900 dark:text-white">
-            Human approval roles
+            {t('settings.teamTitle')}
           </h2>
         </div>
         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-          Use the identity switcher in the top bar. Every confirmation,
-          rejection and information request is attributed in the activity log.
+          {t('settings.teamBody')}
         </p>
         <div className="grid sm:grid-cols-2 gap-2.5 mt-3">
           {[
             {
-              role: 'Owner',
-              can: 'Review every check and approve, reject or request information. Can override a blocker with a written reason.',
-              cannot: 'Overrides are still logged with the identity and reason.',
+              role: t('settings.owner'),
+              can: t('settings.ownerDesc'),
+              cannot: t('settings.ownerCannot'),
             },
             {
-              role: 'Staff',
-              can: 'View orders, stock checks, margin, risk factors and the activity log.',
-              cannot: 'Cannot confirm, reject or request information.',
+              role: t('settings.staff'),
+              can: t('settings.staffDesc'),
+              cannot: t('settings.staffCannot'),
             },
           ].map((item) => (
             <div
@@ -657,12 +790,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-sm font-bold text-amber-900 dark:text-amber-200">
-              Demo data
+              {t('settings.demoTitle')}
             </h2>
             <p className="text-xs text-amber-800/80 dark:text-amber-300/80 mt-0.5 max-w-xl">
-              All customers, orders, stock and suppliers are synthetic. Reset
-              returns this workspace to its seed; switch industry above for a
-              different dataset.
+              {t('settings.demoBody')}
             </p>
           </div>
           <button
@@ -675,7 +806,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             ) : (
               <RotateCcw className="w-3.5 h-3.5" />
             )}
-            Reset {workspace.industry.name} demo
+            {t('settings.resetNamed', { name: workspace.industry.name })}
           </button>
         </div>
       </section>

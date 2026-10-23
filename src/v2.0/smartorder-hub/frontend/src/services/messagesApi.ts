@@ -7,11 +7,33 @@
  */
 
 import {
+  MessageSource,
   NewMessageInput,
   OrderMessage,
   RecognitionStatus,
 } from '../types/message';
 import { apiRequest } from './http';
+
+/** Map a free-text CSV/platform value to a canonical source id. */
+export const sourceFromText = (value: string | undefined): MessageSource => {
+  const source = (value ?? '').toLowerCase();
+  if (source.includes('facebook') || source.includes('messenger') || source === 'fb') {
+    return 'facebook';
+  }
+  if (source.includes('instagram') || source === 'ig') return 'instagram';
+  if (source.includes('telegram') || source === 'tg') return 'telegram';
+  if (source.includes('tiktok') || source.includes('tik tok')) return 'tiktok';
+  if (source.includes('email') || source.includes('mail')) return 'email';
+  if (
+    source.includes('manual') ||
+    source.includes('call') ||
+    source.includes('phone') ||
+    source.includes('walk-in')
+  ) {
+    return 'manual';
+  }
+  return 'whatsapp';
+};
 
 export async function fetchMessages(): Promise<OrderMessage[]> {
   return apiRequest<OrderMessage[]>('/api/messages');
@@ -51,11 +73,12 @@ export async function analyzeMessageAsOrder(
 export async function updateMessageStatus(
   messageId: string,
   newStatus: RecognitionStatus,
-  reviewNotes?: string
+  reviewNotes?: string,
+  extractionAccurate?: boolean
 ): Promise<OrderMessage> {
   return apiRequest<OrderMessage>(`/api/messages/${messageId}`, {
     method: 'PATCH',
-    body: JSON.stringify({ status: newStatus, reviewNotes }),
+    body: JSON.stringify({ status: newStatus, reviewNotes, extractionAccurate }),
   });
 }
 

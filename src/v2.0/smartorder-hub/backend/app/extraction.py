@@ -630,7 +630,7 @@ def rules_extract(
     if target and delivery_time:
         target = f"{target} {delivery_time}"
 
-    industry_fields = _extract_industry_fields(
+    extracted_industry_fields = _extract_industry_fields(
         text,
         industry,
         delivery_type,
@@ -639,6 +639,10 @@ def rules_extract(
         address,
         items,
     )
+    industry_fields = {
+        field["key"]: extracted_industry_fields.get(field["key"])
+        for field in industry.get("fields", [])
+    }
 
     missing = _missing_fields(
         name, items, delivery_type, address, delivery_date, quantity_missing
@@ -892,7 +896,7 @@ def ai_extract(
     if target and delivery_time:
         target = f"{target} {delivery_time}"
 
-    industry_fields = _extract_industry_fields(
+    extracted_industry_fields = _extract_industry_fields(
         text,
         industry,
         delivery_type,
@@ -902,6 +906,9 @@ def ai_extract(
         items,
     )
     allowed_fields = {field["key"] for field in industry.get("fields", [])}
+    industry_fields = {
+        key: extracted_industry_fields.get(key) for key in allowed_fields
+    }
     for key, value in (data.get("industry_fields") or {}).items():
         if key in allowed_fields and value not in (None, ""):
             industry_fields[key] = _clean(str(value))
@@ -917,7 +924,8 @@ def ai_extract(
     for label in _industry_missing(industry, industry_fields):
         if label not in missing:
             missing.append(label)
-    confidence = float(data.get("confidence") or 0.75)
+    confidence_value = data.get("confidence")
+    confidence = float(confidence_value) if confidence_value is not None else 0.0
     if confidence > 1:
         confidence = confidence / 100
     confidence = max(0.0, min(1.0, confidence))

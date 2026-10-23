@@ -1,4 +1,11 @@
-export type MessageSource = 'whatsapp' | 'email' | 'manual';
+export type MessageSource =
+  | 'whatsapp'
+  | 'facebook'
+  | 'instagram'
+  | 'telegram'
+  | 'email'
+  | 'tiktok'
+  | 'manual';
 
 export type RecognitionStatus =
   | 'not_analyzed'
@@ -47,10 +54,14 @@ export interface OrderMessage {
   source: MessageSource;
   sender: string;
   contact?: string;
+  channelId?: string;
+  channelAccount?: string;
+  externalId?: string;
   timestamp: string; // ISO string
   originalText: string;
   status: RecognitionStatus;
   parsedData?: ParsedOrderData;
+  extractionAccurate?: boolean;
   reviewNotes?: string;
   errorMessage?: string;
   orderId?: string;
@@ -60,6 +71,8 @@ export interface NewMessageInput {
   source: MessageSource;
   sender: string;
   contact?: string;
+  channelAccount?: string;
+  externalId?: string;
   originalText: string;
   timestamp?: string;
 }

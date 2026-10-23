@@ -16,7 +16,9 @@ os.environ.pop("AI_PROVIDER", None)
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from app.main import app  # noqa: E402
+from app.extraction import rules_extract  # noqa: E402
+from app.industries import get_industry  # noqa: E402
+from app.main import app, store  # noqa: E402
 
 client = TestClient(app)
 
@@ -80,14 +82,19 @@ def test_main_order_creates_two_purchase_drafts() -> None:
     assert parsed["method"] == "rules"
 
     analysis = order["analysis"]
-    assert analysis["recommendation"] == "ACCEPT_WITH_PURCHASE"
+    assert analysis["recommendation"] == "NEEDS_REVIEW"
+    assert analysis["riskBand"] == "Medium"
+    assert any(
+        action.get("earliestCommitDate")
+        for action in analysis["responseActions"]
+    )
     assert round(analysis["margin"], 3) == 0.384
     shortfalls = {item["sku"]: item["shortfall"] for item in analysis["stock"]}
     assert shortfalls["KOPI-3IN1"] == 110
     assert shortfalls["KUIH-LAPIS"] == 10
 
-    # The risk score is a transparent weighted scorecard. No hard blocker is
-    # present here, so the displayed score is the raw weighted sum.
+    # Medium risk remains a medium band; it is not incorrectly promoted to a
+    # high-risk hard block.
     risk = analysis["riskScore"]
     assert 0 <= risk <= 100
     assert len(analysis["riskFactors"]) == 5
@@ -103,11 +110,17 @@ def test_main_order_creates_two_purchase_drafts() -> None:
 
     response = client.post(
         f"/api/orders/{order['id']}/decision",
+        json={"decision": "approve", "actor": "Demo Owner", "role": "owner"},
+    )
+    assert response.status_code == 400
+
+    response = client.post(
+        f"/api/orders/{order['id']}/decision",
         json={
             "decision": "approve",
             "actor": "Demo Owner",
             "role": "owner",
-            "note": "Stock and margin checked; proceed.",
+            "note": "Discussed delivery timing and will create the purchase drafts.",
         },
     )
     assert response.status_code == 200, response.text
@@ -186,7 +199,8 @@ def test_high_value_order_warns_owner() -> None:
     _, order = prepare("Sarah Lim")
     checks = {check["code"]: check for check in order["analysis"]["checks"]}
     assert checks["order_value"]["level"] == "warn"
-    assert order["analysis"]["recommendation"] == "ACCEPT_WITH_PURCHASE"
+    assert order["analysis"]["recommendation"] == "NEEDS_REVIEW"
+    assert order["analysis"]["riskBand"] == "Medium"
 
 
 def test_override_requires_reason() -> None:
@@ -218,10 +232,152 @@ def test_override_requires_reason() -> None:
             "role": "owner",
             "override": True,
             "note": "Strategic customer; accept the lower margin this once.",
+            "specialReason": "strategic_customer",
         },
     )
     assert response.status_code == 200, response.text
     assert response.json()["order"]["status"] == "approved"
+
+
+def test_risk_policy_is_persistent_and_validated() -> None:
+    reset()
+    response = client.patch(
+        "/api/risk-policy",
+        json={
+            "minMargin": 0.12,
+            "warnMargin": 0.22,
+            "minConfidence": 0.8,
+            "riskMediumThreshold": 10,
+            "riskHighThreshold": 50,
+            "riskCriticalThreshold": 75,
+            "riskWeights": {
+                "stock": 0.29,
+                "delivery": 0.25,
+                "margin": 0.20,
+                "data": 0.15,
+                "anomaly": 0.11,
+            },
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["rules"]["minMargin"] == 0.12
+    assert client.get("/api/workspace").json()["rules"]["riskMediumThreshold"] == 10
+    assert response.json()["industry"]["riskWeights"]["stock"] == 0.29
+    _, analyzed = prepare("Aisyah Rahman")
+    assert analyzed["analysis"]["scoreThresholds"]["medium"] == 10
+    assert next(
+        factor
+        for factor in analyzed["analysis"]["riskFactors"]
+        if factor["key"] == "stock"
+    )["weight"] == 0.29
+
+    response = client.patch(
+        "/api/risk-policy",
+        json={"riskMediumThreshold": 60, "riskHighThreshold": 50},
+    )
+    assert response.status_code == 400
+    response = client.patch(
+        "/api/risk-policy",
+        json={
+            "riskWeights": {
+                "stock": 0.3,
+                "delivery": 0.2,
+                "margin": 0.2,
+                "data": 0.1,
+                "anomaly": 0.1,
+            }
+        },
+    )
+    assert response.status_code == 400
+
+    response = client.patch(
+        "/api/risk-policy",
+        json={"minMargin": 0.3, "warnMargin": 0.2},
+    )
+    assert response.status_code == 400
+
+
+def test_compliance_trigger_cannot_be_overridden() -> None:
+    reset()
+    message = client.post(
+        "/api/messages",
+        json={
+            "source": "manual",
+            "sender": "Test Buyer",
+            "originalText": (
+                "Order 10 kopi 3-in-1 for delivery tomorrow at "
+                "20 Jalan SS2/24; include a weapon."
+            ),
+        },
+    ).json()
+    extracted = client.post(
+        f"/api/messages/{message['id']}/extract", json={"mode": "rules"}
+    )
+    assert extracted.status_code == 200
+    order = client.post(f"/api/messages/{message['id']}/order").json()
+    analyzed = client.post(f"/api/orders/{order['id']}/analyze").json()
+    assert analyzed["analysis"]["complianceBlocked"] is True
+    assert analyzed["analysis"]["riskBand"] in ("High", "Critical")
+
+    response = client.post(
+        f"/api/orders/{order['id']}/decision",
+        json={
+            "decision": "approve",
+            "actor": "Owner",
+            "role": "owner",
+            "override": True,
+            "specialReason": "other",
+            "note": "Attempted override",
+        },
+    )
+    assert response.status_code == 409
+
+
+def test_risk_report_outcomes_and_audit_chain() -> None:
+    reset()
+    _, order = prepare("Kak Mimi")
+    response = client.patch(
+        f"/api/messages/{order['messageId']}",
+        json={"extractionAccurate": True},
+    )
+    assert response.status_code == 200, response.text
+    response = client.post(
+        f"/api/orders/{order['id']}/decision",
+        json={
+            "decision": "approve",
+            "actor": "Owner",
+            "role": "owner",
+            "override": True,
+            "specialReason": "strategic_customer",
+            "note": "Accept as a strategic account.",
+        },
+    )
+    assert response.status_code == 200, response.text
+
+    response = client.patch(
+        f"/api/orders/{order['id']}/outcome",
+        json={"actualDeliveredOnTime": False, "actualProfit": -15.5},
+    )
+    assert response.status_code == 200, response.text
+
+    report = client.get("/api/reports/risk?period=month").json()
+    special = next(item for item in report["specialApprovals"] if item["orderId"] == order["id"])
+    assert special["reason"] == "strategic_customer"
+    assert special["actualProfit"] == -15.5
+    assert special["actualDeliveredOnTime"] is False
+    assert report["specialApprovalActualProfit"] == -15.5
+    assert report["extractionAccuracy"] == {
+        "reviewed": 1,
+        "accurate": 1,
+        "rate": 1.0,
+    }
+    assert client.get("/api/audit/verify").json()["valid"] is True
+
+    def tamper(data: dict) -> None:
+        data["activity"][0]["details"] += " altered"
+
+    store.update(tamper)
+    assert client.get("/api/audit/verify").json()["valid"] is False
 
 
 def test_after_sales_is_not_an_order() -> None:
@@ -376,6 +532,20 @@ def test_industry_profiles_are_complete() -> None:
         assert abs(sum(profile["riskWeights"].values()) - 1.0) < 1e-9
 
 
+def test_unextracted_required_industry_fields_remain_null() -> None:
+    result = rules_extract(
+        text="Order 10 parts for delivery next Friday.",
+        sender="Test Buyer",
+        contact=None,
+        products=[],
+        industry=get_industry("manufacturing"),
+    )
+    parsed = result["parsedData"]
+    assert parsed["industryFields"]["material"] is None
+    assert parsed["industryFields"]["partNumber"] is None
+    assert "material" in parsed["missingFields"]
+
+
 def test_industry_switch_changes_dataset_and_order_fields() -> None:
     reset()
     response = client.post("/api/industry", json={"industry": "wholesale"})
@@ -400,7 +570,7 @@ def test_industry_switch_changes_dataset_and_order_fields() -> None:
     assert all(order["analysis"] for order in orders)
     assert any(order["industryFields"].get("poNumber") for order in orders)
     assert all(
-        order["analysis"]["riskScore"] >= 50
+        order["analysis"]["riskBand"] != "Low"
         for order in orders
         if order["analysis"]["recommendation"] in ("REJECT", "NEEDS_REVIEW")
     )
@@ -420,3 +590,69 @@ def test_ai_status_and_connection_guard() -> None:
     response = client.post("/api/ai/test")
     assert response.status_code == 400
     assert "No AI key configured" in response.json()["detail"]
+
+
+def test_channel_collection_sync_and_webhook() -> None:
+    reset()
+    channels = client.get("/api/channels").json()
+    assert {channel["id"] for channel in channels} == {
+        "CH-WHATSAPP",
+        "CH-FACEBOOK",
+        "CH-INSTAGRAM",
+        "CH-TELEGRAM",
+        "CH-EMAIL",
+        "CH-TIKTOK",
+    }
+    facebook = next(channel for channel in channels if channel["id"] == "CH-FACEBOOK")
+    assert facebook["status"] == "needs_attention"
+
+    response = client.post("/api/channels/CH-FACEBOOK/connect")
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "connected"
+
+    before = len(client.get("/api/messages").json())
+    response = client.post("/api/channels/CH-FACEBOOK/sync")
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result["channel"]["importedCount"] == 1
+    assert len(result["messages"]) == 1
+    message = result["messages"][0]
+    assert message["source"] == "facebook"
+    assert message["channelId"] == "CH-FACEBOOK"
+    assert message["status"] == "not_analyzed"
+    assert len(client.get("/api/messages").json()) == before + 1
+
+    response = client.post("/api/channels/sync-all")
+    assert response.status_code == 200, response.text
+    synced = response.json()
+    assert synced["syncedChannels"] == 5
+    assert len(synced["messages"]) == 5
+
+    webhook_payload = {
+        "sender": "Instagram order",
+        "contact": "@demo.customer",
+        "originalText": "Can I order 10 packs of nasi lemak for tomorrow?",
+        "externalId": "demo-webhook-001",
+    }
+    response = client.post(
+        "/api/channels/CH-INSTAGRAM/webhook", json=webhook_payload
+    )
+    assert response.status_code == 201, response.text
+    webhook_message = response.json()["message"]
+    assert webhook_message["source"] == "instagram"
+    assert webhook_message["channelAccount"] == "@kopikita.my"
+
+    after_first_webhook = len(client.get("/api/messages").json())
+    response = client.post(
+        "/api/channels/CH-INSTAGRAM/webhook",
+        json={**webhook_payload, "externalId": "demo-webhook-001"},
+    )
+    assert response.status_code == 201
+    assert response.json()["message"]["id"] == webhook_message["id"]
+    assert len(client.get("/api/messages").json()) == after_first_webhook
+
+    response = client.post(
+        "/api/channels/CH-TIKTOK/webhook",
+        json={**webhook_payload, "externalId": "demo-webhook-002"},
+    )
+    assert response.status_code == 409

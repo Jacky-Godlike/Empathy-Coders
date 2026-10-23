@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { AlertCircle, Clock, Loader2, RefreshCw } from 'lucide-react';
-import { ActivityEvent } from '../types/order';
-import { fetchActivity } from '../services/ordersApi';
+import { ActivityEvent, RiskReport } from '../types/order';
+import { fetchActivity, fetchRiskReport } from '../services/ordersApi';
+import { useI18n } from '../i18n/I18nContext';
 
 const actionStyle: Record<string, string> = {
   message_received: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
@@ -17,25 +18,48 @@ const actionStyle: Record<string, string> = {
     'bg-cyan-100 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-300',
 };
 
+const actionLabelKeys: Record<string, string> = {
+  message_received: 'activity.actionMessageReceived',
+  message_extracted: 'activity.actionMessageExtracted',
+  order_created: 'activity.actionOrderCreated',
+  order_analyzed: 'activity.actionOrderAnalyzed',
+  order_approved: 'activity.actionOrderApproved',
+  order_rejected: 'activity.actionOrderRejected',
+  info_requested: 'activity.actionInfoRequested',
+  purchase_draft_created: 'activity.actionPurchaseDraft',
+  channel_sync: 'activity.actionChannelSync',
+  channel_connected: 'activity.actionChannelConnected',
+  channel_disconnected: 'activity.actionChannelDisconnected',
+  channel_sync_all: 'activity.actionChannelSyncAll',
+};
+
 export const ActivityView: React.FC = () => {
+  const { t, locale } = useI18n();
   const [events, setEvents] = useState<ActivityEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [report, setReport] = useState<RiskReport | null>(null);
+  const [period, setPeriod] = useState<'week' | 'month'>('week');
 
   const load = useCallback(async (silent = false) => {
     if (silent) setIsRefreshing(true);
     else setIsLoading(true);
     setError(null);
     try {
-      setEvents(await fetchActivity());
+      const [activity, riskReport] = await Promise.all([
+        fetchActivity(),
+        fetchRiskReport(period),
+      ]);
+      setEvents(activity);
+      setReport(riskReport);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Could not load activity');
+      setError(err instanceof Error ? err.message : t('activity.loadError'));
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, []);
+  }, [period, t]);
 
   useEffect(() => {
     load();
@@ -46,11 +70,13 @@ export const ActivityView: React.FC = () => {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-base font-bold text-slate-900 dark:text-white">
-            Activity log
+            {t('activity.title')}
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Every import, extraction, analysis, approval and purchase draft is
-            recorded with an actor and timestamp.
+            {t('activity.subtitle')}
+          </p>
+          <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">
+            {t('activity.originalLanguage')}
           </p>
         </div>
         <button
@@ -61,8 +87,21 @@ export const ActivityView: React.FC = () => {
           <RefreshCw
             className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`}
           />
-          Refresh
+          {t('common.refresh')}
         </button>
+        <label className="text-xs text-slate-500 dark:text-slate-400">
+          <span className="sr-only">{t('activity.reportPeriod')}</span>
+          <select
+            value={period}
+            onChange={(event) =>
+              setPeriod(event.target.value as 'week' | 'month')
+            }
+            className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-2"
+          >
+            <option value="week">{t('activity.week')}</option>
+            <option value="month">{t('activity.month')}</option>
+          </select>
+        </label>
       </div>
 
       {error && (
@@ -72,19 +111,101 @@ export const ActivityView: React.FC = () => {
         </div>
       )}
 
+      {report && (
+        <section className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                {t('activity.riskReport')}
+              </h3>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                {t('activity.reviewedOrders', { count: report.ordersReviewed })}
+              </p>
+            </div>
+            <p className="text-[10px] text-slate-500 dark:text-slate-400">
+              {t('activity.extractionAccuracy', {
+                accurate: report.extractionAccuracy.accurate,
+                reviewed: report.extractionAccuracy.reviewed,
+                rate:
+                  report.extractionAccuracy.rate === null
+                    ? '—'
+                    : `${(report.extractionAccuracy.rate * 100).toFixed(0)}%`,
+              })}
+            </p>
+          </div>
+          <div className="grid md:grid-cols-2 gap-3 mt-3">
+            <div>
+              <h4 className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">
+                {t('activity.topRiskTypes')}
+              </h4>
+              {report.riskTriggerTop5.length ? (
+                <ul className="space-y-1.5">
+                  {report.riskTriggerTop5.map((item) => (
+                    <li key={item.category} className="flex justify-between gap-2 text-[11px] text-slate-700 dark:text-slate-300">
+                      <span>{item.category}</span>
+                      <strong>{item.count}</strong>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-[11px] text-slate-400">{t('activity.noRiskTriggers')}</p>
+              )}
+            </div>
+            <div>
+              <h4 className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">
+                {t('activity.specialApprovals')}
+              </h4>
+              <p className="text-[11px] text-slate-700 dark:text-slate-300">
+                {t('activity.specialApprovalProfit', {
+                  expected: report.specialApprovalExpectedProfit.toFixed(2),
+                  actual: report.specialApprovalActualProfit.toFixed(2),
+                })}
+              </p>
+              <p className="text-[10px] text-slate-400 mt-1">
+                {report.specialApprovals.length
+                  ? report.specialApprovals.map((item) => `${item.orderId} · ${item.reason || '—'}`).join(' | ')
+                  : t('activity.noSpecialApprovals')}
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 border-t border-slate-100 dark:border-slate-800 pt-3">
+            <h4 className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">
+              {t('activity.accuracyTrend')}
+            </h4>
+            <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
+              {report.extractionAccuracyTrend.map((point) => (
+                <div key={point.label} title={`${point.accurate}/${point.reviewed}`} className="text-center">
+                  <div className="h-10 flex items-end rounded bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                    <div
+                      className="w-full bg-emerald-500"
+                      style={{
+                        height: `${point.rate === null ? 0 : point.rate * 100}%`,
+                      }}
+                    />
+                  </div>
+                  <p className="mt-1 text-[8px] text-slate-400">
+                    {point.label.slice(5)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
       {isLoading ? (
         <div className="flex items-center justify-center py-16 text-slate-400 text-xs gap-2">
           <Loader2 className="w-4 h-4 animate-spin" />
-          Loading activity…
+          {t('activity.loading')}
         </div>
       ) : events.length === 0 ? (
         <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-10 text-center space-y-2">
           <Clock className="w-10 h-10 text-slate-300 mx-auto" />
           <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-            No activity yet
+            {t('activity.empty')}
           </p>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Import a message or reset the demo to seed the inbox.
+            {t('activity.emptyBody')}
           </p>
         </div>
       ) : (
@@ -92,18 +213,18 @@ export const ActivityView: React.FC = () => {
           <table className="w-full text-xs text-left min-w-[760px]">
             <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700">
               <tr>
-                <th className="py-2.5 px-3">Time</th>
-                <th className="py-2.5 px-3">Actor</th>
-                <th className="py-2.5 px-3">Action</th>
-                <th className="py-2.5 px-3">Entity</th>
-                <th className="py-2.5 px-3">Details</th>
+                <th className="py-2.5 px-3">{t('activity.time')}</th>
+                <th className="py-2.5 px-3">{t('activity.actor')}</th>
+                <th className="py-2.5 px-3">{t('activity.action')}</th>
+                <th className="py-2.5 px-3">{t('activity.entity')}</th>
+                <th className="py-2.5 px-3">{t('activity.details')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {events.map((event) => (
                 <tr key={event.id}>
                   <td className="py-2.5 px-3 text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    {new Date(event.ts).toLocaleString()}
+                    {new Date(event.ts).toLocaleString(locale)}
                   </td>
                   <td className="py-2.5 px-3">
                     <p className="font-medium text-slate-800 dark:text-slate-200">
@@ -115,7 +236,9 @@ export const ActivityView: React.FC = () => {
                     <span
                       className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold ${actionStyle[event.action] || 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'}`}
                     >
-                      {event.action}
+                      {actionLabelKeys[event.action]
+                        ? t(actionLabelKeys[event.action])
+                        : event.action}
                     </span>
                   </td>
                   <td className="py-2.5 px-3 font-mono text-[10px] text-slate-500 dark:text-slate-400">

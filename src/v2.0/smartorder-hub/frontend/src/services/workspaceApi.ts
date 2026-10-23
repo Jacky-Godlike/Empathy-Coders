@@ -10,6 +10,16 @@ export function fetchWorkspace(): Promise<Workspace> {
   return apiRequest<Workspace>('/api/workspace');
 }
 
+export function updateRiskPolicy(
+  rules: Workspace['rules'],
+  riskWeights: Record<string, number>
+): Promise<Workspace> {
+  return apiRequest<Workspace>('/api/risk-policy', {
+    method: 'PATCH',
+    body: JSON.stringify({ ...rules, riskWeights }),
+  });
+}
+
 export function fetchIndustries(): Promise<{ industries: IndustryProfile[] }> {
   return apiRequest<{ industries: IndustryProfile[] }>('/api/industries');
 }
