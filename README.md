@@ -20,10 +20,10 @@
 | Resource | Link / status |
 | --- | --- |
 | **GitHub Repository** | [Empathy-Coders](https://github.com/Jacky-Godlike/Empathy-Coders) |
-| **Replit Project** | **To be added** |
+| **Replit Project** | **[Open SmartOrder Hub](https://smart-order-hub-1.replit.app/)** |
 | **Live Demo (Replit)** | **[Open SmartOrder Hub](https://smart-order-hub-1.replit.app/)** |
-| **RunPod API** | **To be added / N/A** |
-| **Pitch Deck / Slides** | **To be added** |
+| **RunPod API** | **N/A** |
+| **Pitch Deck / Slides** | [SmartOrder_Hub Slide](SmartOrder-Hub-Pitch-Deck.pptx) |
 | **Pitching / Product Demo Video (YouTube)** | **To be added** |
 | **Preliminary Submission PDF** | [SDC2026_Empathy Coders_Preliminary.pdf](submission/SDC2026_Empathy%20Coders_Preliminary.pdf) |
 | **Technical & Tools Declaration** | [SDC2026_Empathy Coders_TechDeclaration.pdf](submission/SDC2026_Empathy%20Coders_TechDeclaration.pdf) |
