@@ -27,7 +27,7 @@
 | **Pitching / Product Demo Video (YouTube)** | **To be added** |
 | **Preliminary Submission PDF** | [SDC2026_Empathy Coders_Preliminary.pdf](submission/SDC2026_Empathy%20Coders_Preliminary.pdf) |
 | **Technical & Tools Declaration** | [SDC2026_Empathy Coders_TechDeclaration.pdf](submission/SDC2026_Empathy%20Coders_TechDeclaration.pdf) |
-| **Replit Usage Proof** | **To be added** |
+| **Replit Usage Proof** | [REPLIT_PROOF_OF_USE.pdf](submission/REPLIT_PROOF_OF_USE.pdf) |
 | **Apache License 2.0** | [LICENSE](LICENSE) |
 
 ## Overview
