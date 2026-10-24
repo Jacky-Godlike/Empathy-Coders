@@ -1,0 +1,120 @@
+@import "tailwindcss";
+
+/*
+ * SmartOrder Hub uses one warm, paper-like light theme. There is no dark-mode
+ * toggle, so `dark:` utilities stay inert unless a `.dark` class is added.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* Warm paper and coffee neutrals. */
+  --color-white: #fffdf8;
+  --color-slate-50: #faf6ee;
+  --color-slate-100: #f4ecdf;
+  --color-slate-200: #e9ddca;
+  --color-slate-300: #d8c6ac;
+  --color-slate-400: #b09a7d;
+  --color-slate-500: #8e785c;
+  --color-slate-600: #715c45;
+  --color-slate-700: #5a4737;
+  --color-slate-800: #413429;
+  --color-slate-900: #30261e;
+  --color-slate-950: #211a15;
+
+  /* Terracotta replaces the old blue primary. */
+  --color-blue-50: #fdf3e7;
+  --color-blue-100: #f8e5cf;
+  --color-blue-200: #f0cca8;
+  --color-blue-300: #e3ac7c;
+  --color-blue-400: #d58a55;
+  --color-blue-500: #c96f3c;
+  --color-blue-600: #b45a2c;
+  --color-blue-700: #964822;
+  --color-blue-800: #7a3b1e;
+  --color-blue-900: #5e2f1a;
+  --color-blue-950: #3a1c10;
+
+  /* Olive green keeps success states warm rather than neon. */
+  --color-emerald-50: #eef4e8;
+  --color-emerald-100: #dfead4;
+  --color-emerald-200: #c5d9b4;
+  --color-emerald-300: #a8c494;
+  --color-emerald-400: #8aab74;
+  --color-emerald-500: #6f9160;
+  --color-emerald-600: #567a49;
+  --color-emerald-700: #45643b;
+  --color-emerald-800: #374f30;
+  --color-emerald-900: #2d4027;
+  --color-emerald-950: #1f2c1b;
+
+  /* Muted dusty blue for email/source badges. */
+  --color-sky-50: #f0f5f6;
+  --color-sky-100: #e0eaed;
+  --color-sky-200: #c2d6dc;
+  --color-sky-300: #9ebcc5;
+  --color-sky-400: #7da3ae;
+  --color-sky-500: #648894;
+  --color-sky-600: #526f7a;
+  --color-sky-700: #455c66;
+  --color-sky-800: #394b53;
+  --color-sky-900: #314147;
+  --color-sky-950: #1f2a2e;
+
+  /* Warm brown for the AI panel instead of purple. */
+  --color-violet-50: #f8f1e9;
+  --color-violet-100: #f1e3d5;
+  --color-violet-200: #e2c9b2;
+  --color-violet-300: #cfa98a;
+  --color-violet-400: #b98a67;
+  --color-violet-500: #a7714f;
+  --color-violet-600: #9a6842;
+  --color-violet-700: #7d5232;
+  --color-violet-800: #68452b;
+  --color-violet-900: #4f3422;
+  --color-violet-950: #342216;
+}
+
+:root {
+  color-scheme: light;
+  font-family:
+    "Avenir Next",
+    "Segoe UI",
+    "Helvetica Neue",
+    ui-sans-serif,
+    system-ui,
+    sans-serif;
+}
+
+html {
+  background-color: var(--color-slate-50);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(
+      1100px 520px at 8% -8%,
+      rgba(180, 112, 62, 0.11),
+      transparent 60%
+    ),
+    radial-gradient(
+      900px 480px at 100% 0%,
+      rgba(111, 128, 93, 0.09),
+      transparent 55%
+    ),
+    var(--color-slate-50);
+  color: var(--color-slate-900);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+::selection {
+  background: rgba(180, 90, 44, 0.2);
+}
+
+* {
+  scrollbar-color: var(--color-slate-300) var(--color-slate-100);
+}
