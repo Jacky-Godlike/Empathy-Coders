@@ -1,6 +1,6 @@
 # Empathy-Coders — SmartOrder Hub V3.0
 
-**SDC Hackathon 2026 · Domain 2 - ALPHA RED**  
+**SDC Hackathon 2026 · Domain 2 - Orbyte Smart SME Challenge**  
 > A multilingual order intake, risk analysis and owner-approval prototype for Malaysian micro and small businesses.
 
 ## Team Information
@@ -8,7 +8,7 @@
 | Field | Details |
 | --- | --- |
 | **Team Name** | Empathy Coders (GitHub: `Empathy-Coders`) |
-| **Team Domain** | Domain 2 - ALPHA RED |
+| **Team Domain** | Domain 2 - Orbyte Smart SME Challenge |
 | **SDG Track (1–17)** | SDG 8 — Decent Work and Economic Growth |
 | **Team Leader** | YANG JIAHUI |
 | **University** | Xiamen University Malaysia |
