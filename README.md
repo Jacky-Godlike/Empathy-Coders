@@ -24,7 +24,7 @@
 | **Live Demo (Replit)** | **[Open SmartOrder Hub](https://smart-order-hub-1.replit.app/)** |
 | **RunPod API** | **N/A** |
 | **Pitch Deck / Slides** | [SmartOrder_Hub Slide](SmartOrder-Hub-Pitch-Deck.pptx) |
-| **Pitching / Product Demo Video (YouTube)** | **To be added** |
+| **Pitching / Product Demo Video (YouTube)** | [Youtube Link](https://youtu.be/JQLEW7VR_lU) |
 | **Preliminary Submission PDF** | [SDC2026_Empathy Coders_Preliminary.pdf](submission/SDC2026_Empathy%20Coders_Preliminary.pdf) |
 | **Technical & Tools Declaration** | [SDC2026_Empathy Coders_TechDeclaration.pdf](submission/SDC2026_Empathy%20Coders_TechDeclaration.pdf) |
 | **Replit Usage Proof** | [REPLIT_PROOF_OF_USE.pdf](submission/REPLIT_PROOF_OF_USE.pdf) |
